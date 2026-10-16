@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Blocks a commit that would publish internal names, hosts, IPs or paths. See scripts/leak-check.sh.
+exec "$(git rev-parse --show-toplevel)/scripts/leak-check.sh" --staged
