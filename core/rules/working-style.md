@@ -12,7 +12,12 @@
   practice.
 - `.claude/CLAUDE.md` is the harness entry point: an index of rules, agents and hooks. Don't bloat
   it with detailed rules; add or extend a file under [`rules/`](.) instead. Project facts go in
-  `.claude/project.md`.
+  `.claude/project.md`, and project-owned rules in `.claude/rules/project/`.
+- **Installed harness files are not edited in place** (2026-10-19). Make harness changes at the
+  harness source, which the `source` line of `.claude/.harness-manifest` names, and apply them with
+  `install.sh --update`. An in-place edit is drift: the session-start line reports it as
+  `harness_edited=<n>`, and `install.sh --doctor` lists the files. `rules/project/`,
+  `project.md` and `project/checks.sh` are the project's own and never count as drift.
 - `.mcp.json` lives at the repo root (Claude Code only discovers it there): the one exception to
   "everything Claude-related lives under `.claude/`".
 - `.claude/settings.local.json` is per-developer.

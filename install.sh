@@ -31,6 +31,7 @@ VERSION="$(git -C "$SRC" describe --always --dirty 2>/dev/null || echo uncommitt
 hash() { sha256sum "$1" | cut -d' ' -f1; }
 core_files() { (cd "$CORE" && find . -type f ! -name settings.json | sed 's|^\./||' | sort); }
 man_hash() { [ -f "$MAN" ] && awk -v p="$1" '$2==p {print $1}' "$MAN"; }
+man_entries() { grep -vE '^(#|version |source )' "$MAN"; }   # "<hash>  <path>" lines; header lines by prefix, so a pre-2026-10-19 2-line header parses too
 
 merge_settings() { # merge core hook registrations into DEST/settings.json, skipping duplicates
   node -e '
@@ -51,7 +52,7 @@ merge_settings() { # merge core hook registrations into DEST/settings.json, skip
 }
 
 write_manifest() { # write_manifest <file listing "<hash>  <path>" lines>
-  { echo "# claude-code-harness manifest — do not edit"; echo "version $VERSION"; cat "$1"; } > "$MAN"
+  { echo "# claude-code-harness manifest — do not edit"; echo "version $VERSION"; echo "source $SRC"; cat "$1"; } > "$MAN"
 }
 
 case "$MODE" in
@@ -90,7 +91,7 @@ update)
     fi
     echo "$(hash "$DEST/$f")  $f" >> "$TMP"
   done < <(core_files)
-  awk 'NR>2 {print $2}' "$MAN" | while read -r f; do
+  man_entries | awk '{print $2}' | while read -r f; do
     [ -e "$CORE/$f" ] || echo "  no longer in core (left in place, delete if unused): $f"
   done
   merge_settings
@@ -99,13 +100,13 @@ update)
   ;;
 doctor)
   [ -f "$MAN" ] || { echo "doctor: not installed (no $MAN)" >&2; exit 2; }
-  echo "installed: $(sed -n 's/^version //p' "$MAN") · this core: $VERSION"
+  echo "installed: $(sed -n 's/^version //p' "$MAN") · this core: $VERSION · source: $(sed -n 's/^source //p' "$MAN" | grep . || echo unrecorded)"
   ISSUES=0
   while read -r h f; do
     if [ ! -e "$DEST/$f" ]; then echo "  missing: $f"; ISSUES=$((ISSUES+1))
     elif [ "$(hash "$DEST/$f")" != "$h" ]; then echo "  edited locally: $f"; ISSUES=$((ISSUES+1)); fi
     if [ -e "$CORE/$f" ] && [ "$h" != "$(hash "$CORE/$f")" ]; then echo "  outdated (core changed): $f"; fi
-  done < <(awk 'NR>2' "$MAN")
+  done < <(man_entries)
   core_files | while read -r f; do man_hash "$f" | grep -q . || echo "  new in core, not installed: $f"; done
   find "$DEST" -name '*.harness-new' | sed "s|$DEST/|  unmerged update: |"
   [ "$ISSUES" -eq 0 ] && echo "  manifest: all installed files match"

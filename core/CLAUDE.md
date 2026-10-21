@@ -18,14 +18,20 @@ skip the steps that need them.
 
 ## Rules
 
-Detailed rules live under [rules/](./rules/). They are **not** auto-loaded: read the relevant file
-before the matching action.
+Detailed rules live under [rules/](./rules/).
+- **Claude Code loads every `rules/**/*.md` at session start, recursively, into the main session
+  and every subagent** (measured 2026-10-19). The one exception is a rule with `paths:`
+  frontmatter, which loads only once a file matching its globs is touched.
+- So each rule's size is paid per session and per dispatch. A rule needed only for one kind of
+  task belongs behind `paths:`, or outside `rules/` with an index line here.
+- **Project-owned rules go in `rules/project/`.** The installer never writes there, and Claude Code
+  discovers the folder on its own, so no index is needed.
 
 - [working-style.md](./rules/working-style.md) — diffs, reviews, decision capture, where harness files live
 - [code-conventions.md](./rules/code-conventions.md) — read before writing a component or helper: icons as components, JSDoc on exported helpers, generic helpers in generic files
 - [autonomy.md](./rules/autonomy.md) — what's OK without asking, what to ask the owner first (pushes, branches, any write to a shared system)
 - [git.md](./rules/git.md) — commit messages, branch names, pushing, diverged branches; the promotion flow is in `project.md`
-- [delegation.md](./rules/delegation.md) — **the main session hands lookups to Haiku**: broad repo sweeps → `searcher`, web/docs lookups → `web-reader`; cite only hook-verified `sources[]`
+- [delegation.md](./rules/delegation.md) — **the main session hands lookups and commands to Haiku**: broad repo sweeps → `searcher`, web/docs lookups → `web-reader`, long or repetitive commands (lint, builds, log sweeps, multi-step git) → `runner`, which runs only verbatim commands and lints report-only; cite only hook-verified `sources[]`
 - [research-discipline.md](./rules/research-discipline.md) — provenance label on every claim, pin every source's version, positive control before any null, stop triggers, assumptions ledger
 - [research-workflow.md](./rules/research-workflow.md) — the research team's contract (`/research`)
 - [ai-workflow.md](./rules/ai-workflow.md) — the feature workflow's contract: Planner → Coder → Tester → Reviewer, `/feature-flow`
@@ -45,8 +51,9 @@ topic doesn't fit, then index it here.
 |---|---|---|
 | Feature workflow | planner, coder, tester, reviewer | `/planner`, `/coder`, `/tester`, `/reviewer`, `/feature-flow` |
 | Research team | research-lead, searcher, web-reader, incident-investigator, repro-driver, designer, writer | `/research` |
+| Delegation | runner | dispatched directly ([delegation.md](./rules/delegation.md)) |
 
-`searcher` and `web-reader` may also be dispatched directly by the main session
+`searcher`, `web-reader` and `runner` may be dispatched directly by the main session
 ([delegation.md](./rules/delegation.md)). No agent commits, pushes or creates branches.
 
 **Prerequisites** (plugins the agents invoke): `superpowers` (brainstorming, writing-plans,

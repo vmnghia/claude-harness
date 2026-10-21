@@ -54,13 +54,18 @@ Where `rules/code-conventions.md` and the agents look for things.
 
 ## Commands
 
-| Purpose | Command | Notes |
-|---|---|---|
-| Build (Coder's gate) | TODO | the full pipeline, not a partial step |
-| Dev server (Tester) | TODO | |
-| Tests | TODO or `none` | `none` = Coder reports `test_result: n/a` |
-| Lint | TODO | not run unprompted by agents |
-| Codegen | none | |
+| Purpose | Command | Notes | Writes files |
+|---|---|---|---|
+| Build (Coder's gate) | TODO | the full pipeline, not a partial step | no |
+| Dev server (Tester) | TODO | | no |
+| Tests | TODO or `none` | `none` = Coder reports `test_result: n/a` | no |
+| Lint | TODO | report-only, never `--fix`. Through the `runner` agent: `<lint> -f json -o <run_dir>/eslint.json` (allowed exit 0/1), then `node .claude/scripts/eslint-summary.js <run_dir>/eslint.json <changed paths…>` | no |
+| Lint on request only | no | `yes` = the runner lints only when asked; `no` = it may lint unprompted | no |
+| Codegen | none | | no |
+
+`Writes files: yes` marks a command that rewrites files in the working tree (an auto-fixing lint, a
+formatter). The `runner` agent refuses any step whose first two words match such a command. List
+the project's auto-fix scripts here as their own rows (e.g. `Lint (auto-fix) | <script> | | yes`).
 
 ## Dev server
 

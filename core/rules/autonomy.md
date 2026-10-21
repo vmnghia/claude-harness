@@ -27,7 +27,7 @@ Default ask-first. Trust will expand as work proves out.
 Sensitivity overrides category — if a "default-OK" action lands near a high-risk surface, ask anyway.
 
 ## Don't do unprompted
-- **Don't run the project's lint command** as a post-task verification step. The owner runs lint themselves (commit hooks, IDE, or their own pass). Lint runs can be slow and surface pre-existing noise unrelated to your change. The build and a type-check are still fair game for confirming an edit compiles — different concern.
+- **Don't run lint inline** as a post-task verification step. Lint runs can be slow and surface pre-existing noise unrelated to your change, and that output in the main context is what this rule protects against. **Exception (2026-10-19):** lint may run through the `runner` agent, **report-only** (never `--fix`, never a command `project.md` marks `Writes files: yes`), unprompted, unless `project.md` § Commands sets `Lint on request only` to `yes`. Recipe: [delegation.md](./delegation.md#runner-briefs). The build and a type-check are still fair game for confirming an edit compiles — different concern.
 
 ## Mechanical guardrails (hooks)
 
@@ -39,4 +39,5 @@ the owner decide. Its push check matches shared-branch names **anywhere in the c
 string** ("loose match by design"), so keep a push alone in its own command: on
 2026-10-02 a push of a feature branch was denied because a ledger `echo` in the same
 command contained the word `stable`. The no-auto-lint rule above applies to subagents too (Coder
-runs the build, and tests when the project has a runner — not lint).
+runs the build, and tests when the project has a runner — not lint); the `runner`
+agent's report-only lint is the one exception.

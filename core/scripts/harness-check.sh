@@ -357,6 +357,108 @@ for a in searcher web-reader; do
 done
 check "research-workflow.md documents standalone use" grep -q "Standalone use" "$RW"
 
+echo "== 5d. Runner: verbatim command runner (2026-10-19) =="
+# What this can't prove: that runner REFUSES at runtime. Agent files load at session start, so test
+# refusals with a fresh `claude -p` dispatch (delegation.md, "Runner briefs").
+PT="$ROOT/project-template/project.md"   # exists in the harness source repo only, not once installed
+if [ "$H" = "$ROOT/core" ] && [ -f "$PT" ]; then
+  check "project template: Commands has a 'Writes files' column" grep -qF '| Purpose | Command | Notes | Writes files |' "$PT"
+  check "project template: lint recipe names eslint-summary.js" grep -qF 'eslint-summary.js' "$PT"
+else
+  echo "  SKIP  project template checks (not the harness source repo)"
+fi
+
+RN="$AG/runner.md"
+if [ -f "$RN" ]; then
+  ok "agents/runner.md exists"
+  [ "$(model_of "$RN")" = "claude-haiku-5-5" ] && ok "runner model claude-haiku-5-5" || fail "runner model is not claude-haiku-5-5"
+  for t in Bash Read; do has_tool "$RN" "$t" && ok "runner has $t" || fail "runner lacks $t"; done   # Grep may be listed, but is absent at runtime (2026-10-19)
+  for t in Write Edit Agent NotebookEdit; do has_tool "$RN" "$t" && fail "runner has $t (it must not edit files or dispatch)" || ok "runner has no $t"; done
+  case "$(tools_of "$RN")" in *'*'*) fail "runner tool list contains '*'";; *) ok "runner tool list has no wildcard";; esac
+  for tok in "verbatim" "--fix" "repo_root" "Writes files" "approval" "Never count" 'EPOCHREALTIME' 'Never depend on it' \
+             'simple command' 'VAR=value' 'yarn run X' 'as many words as' '`..` segment' "can't be read" "cd '<repo_root>' && mkdir -p"; do
+    grep -qF -- "$tok" "$RN" && ok "runner.md states '$tok'" || fail "runner.md lost '$tok'"
+  done
+  check "runner description names delegation.md" sh -c "sed -n 's/^description: //p' '$RN' | grep -q 'delegation.md'"
+else
+  fail "agents/runner.md missing"
+fi
+check "delegation.md has the runner row" grep -qF '| `runner` |' "$H/rules/delegation.md"
+grep -qF 'A failed check comes back `FAILED`' "$H/rules/delegation.md" && fail "delegation.md says a failed check returns FAILED (runner returns DONE + fail verdict)" || ok "delegation.md doesn't contradict runner check semantics"
+check "delegation.md: DONE doesn't mean the checks passed" grep -qF "doesn't mean the checks passed" "$H/rules/delegation.md"
+check "delegation.md lint recipe includes untracked files" grep -qF 'git ls-files --others --exclude-standard' "$H/rules/delegation.md"
+check "delegation.md has '## Runner briefs'" grep -qxF '## Runner briefs' "$H/rules/delegation.md"
+check "autonomy.md scopes lint to the runner" grep -qF 'through the `runner` agent' "$H/rules/autonomy.md"
+check "autonomy.md names the 'Lint on request only' opt-out" grep -qF 'Lint on request only' "$H/rules/autonomy.md"
+check "CLAUDE.md documents rules/project/" grep -qF 'rules/project/' "$H/CLAUDE.md"
+check "CLAUDE.md documents paths: frontmatter" grep -qF 'paths:' "$H/CLAUDE.md"
+grep -qF 'not** auto-loaded' "$H/CLAUDE.md" && fail "CLAUDE.md still claims rules are not auto-loaded (measured false 2026-10-19)" || ok "CLAUDE.md no longer claims rules aren't auto-loaded"
+ES="$H/scripts/eslint-summary.js"   # optional helper for ESLint projects (2026-10-19)
+check "eslint-summary.js exists+executable" test -x "$ES"
+check "eslint-summary.js syntax" node --check "$ES"
+ET=$(mktemp -d)
+cat > "$ET/r.json" <<JSON
+[{"filePath":"$ROOT/src/a.ts","errorCount":1,"warningCount":1,"messages":[
+   {"ruleId":"no-unused-vars","severity":2,"message":"x unused","line":3,"column":5},
+   {"ruleId":"semi","severity":1,"message":"Missing semicolon","line":4,"column":1}]},
+ {"filePath":"$ROOT/src/b.ts","errorCount":2,"warningCount":0,"messages":[
+   {"ruleId":"no-unused-vars","severity":2,"message":"y unused","line":7,"column":2},
+   {"ruleId":null,"severity":2,"fatal":true,"message":"Parsing error","line":1,"column":1}]}]
+JSON
+EOUT=$(node "$ES" "$ET/r.json" src/a.ts src/nope.ts 2>&1); ERC=$?
+es() { printf '%s\n' "$EOUT" | grep -qxF -- "$2" && ok "eslint-summary: $1" || fail "eslint-summary: $1 (wanted: $2)"; }
+[ "$ERC" -eq 0 ] && ok "eslint-summary: exit 0 on a report with errors" || fail "eslint-summary: exit $ERC on fixture"
+es "totals"                   "TOTAL errors=3 warnings=1 files=2 files_with_errors=2 fatal=1"
+es "top rule first"           "RULE no-unused-vars errors=2 warnings=0"
+es "parse errors named"       "RULE (parse error) errors=1 warnings=0"
+es "error files by count"     "ERROR_FILE src/b.ts errors=2"
+es "changed file counted"     "CHANGED src/a.ts errors=1 warnings=1"
+es "changed error located"    "CHANGED_ERROR src/a.ts:3:5 no-unused-vars x unused"
+es "unlinted changed path"    "CHANGED_NOT_LINTED src/nope.ts"
+printf '%s\n' "$EOUT" | grep -q "^CHANGED src/b.ts" && fail "eslint-summary: unchanged b.ts reported as CHANGED" || ok "eslint-summary: unchanged file not CHANGED"
+printf '%s\n' "$EOUT" | grep -q "^CHANGED_ERROR.*semi" && fail "eslint-summary: a warning listed as CHANGED_ERROR" || ok "eslint-summary: warnings stay out of CHANGED_ERROR"
+node "$ES" >/dev/null 2>&1; [ $? -eq 64 ] && ok "eslint-summary: usage → 64" || fail "eslint-summary: usage exit"
+echo '{not json' > "$ET/bad.json"; node "$ES" "$ET/bad.json" >/dev/null 2>&1; [ $? -eq 65 ] && ok "eslint-summary: bad report → 65" || fail "eslint-summary: bad-report exit"
+MC=$(sed -n '/^function matchesChanged/,/^}/p' "$ES" 2>/dev/null)
+if [ -n "$MC" ] && node -e '
+  const path=require("path"); const ROOT=process.argv[1]; '"$MC"'
+  const t=[["src/a.ts","./src/a.ts",true],["src/c/x.ts","src/c/",true],["src/ab.ts","src/a",false],["src/a.ts",".",false],["src/a.ts","../other/src/a.ts",false]];
+  process.exit(t.every(([r,a,e])=>matchesChanged(r,a)===e)?0:1)' "$ROOT" 2>/dev/null
+then ok "eslint-summary: matchesChanged edge cases (./, dir/, boundary, root, outside)"
+else fail "eslint-summary: matchesChanged edge cases"; fi
+node -e 'const fs=require("fs"),[f,root]=process.argv.slice(1);fs.writeFileSync(f,JSON.stringify([{filePath:root+"/src/c.ts",errorCount:25,warningCount:0,messages:Array.from({length:25},(_,i)=>({ruleId:"r",severity:2,message:"m"+i,line:i+1,column:1}))}]))' "$ET/cap.json" "$ROOT"
+COUT=$(node "$ES" "$ET/cap.json" src/c.ts $(for i in $(seq 1 25); do printf 'x%s.md ' "$i"; done) 2>&1)
+[ "$(printf '%s\n' "$COUT" | grep -c '^CHANGED_ERROR src/c.ts')" = 20 ] && ok "eslint-summary: CHANGED_ERROR capped at 20 per file" || fail "eslint-summary: CHANGED_ERROR not capped at 20"
+printf '%s\n' "$COUT" | grep -qxF 'CHANGED_ERROR_MORE src/c.ts 5' && ok "eslint-summary: CHANGED_ERROR_MORE line" || fail "eslint-summary: no CHANGED_ERROR_MORE src/c.ts 5"
+[ "$(printf '%s\n' "$COUT" | grep -c '^CHANGED_NOT_LINTED ')" = 20 ] && printf '%s\n' "$COUT" | grep -qxF 'CHANGED_NOT_LINTED_MORE 5' && ok "eslint-summary: CHANGED_NOT_LINTED capped at 20 + _MORE" || fail "eslint-summary: CHANGED_NOT_LINTED not capped"
+rm -rf "$ET"
+
+if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then   # the harness source repo only: never an adopter's own install.sh (2026-10-19)
+  IT=$(mktemp -d); git -C "$IT" init -q
+  bash "$ROOT/install.sh" "$IT" >/dev/null 2>&1
+  sed -n 3p "$IT/.claude/.harness-manifest" 2>/dev/null | grep -q '^source /' && ok "install: manifest line 3 records 'source <path>'" || fail "install: manifest has no 'source' line 3"
+  sc() { CLAUDE_PROJECT_DIR="$IT" bash "$IT/.claude/hooks/session-context.sh" 2>/dev/null; }
+  sc | grep -q 'harness_edited=0' && ok "session-context: clean install → harness_edited=0" || fail "session-context: no harness_edited=0 on a clean install"
+  sc | grep -q 'harness_source=/' && ok "session-context: prints harness_source" || fail "session-context: no harness_source"
+  echo '<!-- local edit -->' >> "$IT/.claude/rules/git.md"
+  sc | grep -q 'harness_edited=1' && ok "session-context: one edited file → harness_edited=1" || fail "session-context: edit not counted"
+  mv "$IT/.claude/.harness-manifest" "$IT/m.bak"; OUT=$(sc); RC=$?
+  { [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q '^\[harness\]' && ! printf '%s' "$OUT" | grep -q 'harness_edited'; } \
+    && ok "session-context: no manifest → line printed, no drift fields, exit 0" || fail "session-context: no-manifest case"
+  mv "$IT/m.bak" "$IT/.claude/.harness-manifest"; rm -f "$IT/.claude/rules/bug-fixes.md"; OUT=$(sc); RC=$?
+  { [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q 'harness_edited=1'; } \
+    && ok "session-context: deleted installed file → exit 0, not counted as edited" || fail "session-context: deleted-file case"
+  IT2=$(mktemp -d); git -C "$IT2" init -q; bash "$ROOT/install.sh" "$IT2" >/dev/null 2>&1
+  grep -v '^source ' "$IT2/.claude/.harness-manifest" > "$IT2/m" && mv "$IT2/m" "$IT2/.claude/.harness-manifest"   # legacy 2-line header
+  DOC=$(bash "$ROOT/install.sh" --doctor "$IT2" 2>&1)
+  { printf '%s' "$DOC" | grep -q 'manifest: all installed files match' && ! printf '%s' "$DOC" | grep -q 'missing: /'; } \
+    && ok "install --doctor: legacy 2-line manifest parses" || fail "install --doctor: legacy manifest misparsed"
+  printf '#!/bin/sh\ntouch "$(dirname "$0")/ADOPTER_INSTALL_RAN"\n' > "$IT/install.sh"
+  (cd "$IT" && CLAUDE_PROJECT_DIR="$IT" bash "$IT/.claude/scripts/harness-check.sh" >/dev/null 2>&1)
+  [ -e "$IT/ADOPTER_INSTALL_RAN" ] && fail "installed harness-check ran the adopter's own install.sh" || ok "installed harness-check never runs an adopter's install.sh"
+  rm -rf "$IT" "$IT2"
+fi
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
@@ -383,6 +485,27 @@ for h in "Answer" "Assumptions ledger" "Findings" "Not shown / ruled out" "Decis
   check "core heading '## $h'" grep -qxF "## $h" "$FT"
 done
 check "frontmatter has status:" grep -q "^status:" "$FT"
+
+echo "== 9. Project checks (.claude/project/checks.sh, 2026-10-19) =="
+run_project_checks() { # run_project_checks <script>: a project's own checks; each FAIL line it prints counts
+  local out rc n
+  out=$(ROOT="$ROOT" H="$H" bash "$1" 2>&1); rc=$?
+  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/  /'
+  n=$(printf '%s\n' "$out" | grep -c '^ *FAIL ')
+  FAILS=$((FAILS + n))
+  if [ "$rc" -ne 0 ] && [ "$n" -eq 0 ]; then fail "project/checks.sh exited $rc"; fi
+}
+PCT=$(mktemp -d)
+printf 'echo "  PASS  x"; exit 0\n' > "$PCT/ok.sh"
+printf 'echo "  FAIL  y"; exit 1\n' > "$PCT/bad.sh"
+printf 'exit 3\n' > "$PCT/silent.sh"
+pc_delta() { ( FAILS=0; run_project_checks "$1" >/dev/null 2>&1; echo "$FAILS" ); }
+[ "$(pc_delta "$PCT/ok.sh")" = 0 ]     && ok "run_project_checks: passing script adds 0 FAILs"      || fail "run_project_checks: passing script"
+[ "$(pc_delta "$PCT/bad.sh")" = 1 ]    && ok "run_project_checks: its FAIL line counts"             || fail "run_project_checks: FAIL line not counted"
+[ "$(pc_delta "$PCT/silent.sh")" = 1 ] && ok "run_project_checks: silent non-zero exit counts once" || fail "run_project_checks: silent non-zero exit"
+rm -rf "$PCT"
+if [ -f "$H/project/checks.sh" ]; then run_project_checks "$H/project/checks.sh"
+else echo "  SKIP  no project/checks.sh"; fi
 
 echo
 if [ "$FAILS" -eq 0 ]; then
