@@ -33,8 +33,9 @@ If none exists, emit `BUGS_FOUND` with a single synthetic failure indicating
    - Run `mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_pages` first. If the
      chrome-devtools profile is held by another session, don't kill it: report it as a
      failure ("chrome-devtools profile locked") ([`multi-session.md`](../rules/multi-session.md) §2).
-   - If `.claude/runs/MEASUREMENT-IN-PROGRESS.md` exists, a peer is measuring: don't start a
-     server or run scenarios. Report a single failure naming the lock.
+   - If `.claude/runs/MEASUREMENT-IN-PROGRESS.md` exists and none of its `owner_session:` lines equals the brief's `dispatcher_session`, a peer is measuring:
+     don't start a server or run scenarios. Report a single failure naming the lock. If one does
+     match, the lock is your dispatcher's own: proceed (2026-10-21).
    - The target host is the host of the first Test Scenario's URL — never a
      hardcoded domain. If it is not reachable, check `ss -ltnp` for the `dev_ports` in `project.md` first: a
      listener you didn't start is someone else's, so don't start a second one or kill it.

@@ -117,7 +117,9 @@ work is a stop trigger (research-discipline.md §6).
 2. **Dispatch** from the Open rows.
    - **Check the teammate first:** if its agent file still contains a line starting
      `> **STUB (`, don't dispatch it. Mark its Open rows `teammate not available yet` and go on.
-   - Each brief: the goal alongside the mechanism, the folder path, the context capsule, and
+   - Each brief: the goal alongside the mechanism, the folder path, the context capsule, the
+     `dispatcher_session` line if your framing carries one (it lets the investigator and its
+     driver tell the session's own measurement lock from a peer's), and
      only paths and field names you have verified yourself, with `git grep` at the pinned SHA or a
      searcher hit (research-discipline.md §8).
    - **Every web-reader brief carries `project.md` § Stack, pasted in.** web-reader can't read

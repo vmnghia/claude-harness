@@ -92,8 +92,9 @@ they are your payload. Every claim carries a label: measured, read, inferred or 
 7. **Repro**, once the evidence has narrowed the mechanism:
    - If `.claude/agents/repro-driver.md` still contains a line starting `> **STUB (`, don't
      dispatch; set `repro: not_run` and add "repro-driver not available yet" to `open`.
-   - If `.claude/runs/MEASUREMENT-IN-PROGRESS.md` exists, don't dispatch; set `repro: BLOCKED`
-     and name the lock's owner.
+   - If `.claude/runs/MEASUREMENT-IN-PROGRESS.md` exists and none of its `owner_session:` lines equals the brief's `dispatcher_session`, don't
+     dispatch; set `repro: BLOCKED` and name the lock's owner. If one matches, the lock is your
+     dispatcher's own: proceed, and pass the same `dispatcher_session` in the repro brief.
    - Dispatch one `repro-driver` with the **repro brief** below; record its agent id as
      `repro_agent_id`. Wait for its hand-back.
    - Driver `AWAITING_HUMAN` (a block the owner can clear): finish every step that doesn't depend

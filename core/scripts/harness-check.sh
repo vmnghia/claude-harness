@@ -227,6 +227,26 @@ grep -qF 'on create, message only' "$MSR" && ok "multi-session.md §6 agrees wit
 grep -qE 'Message peers \*\*before\*\* registering' "$MSR" && fail "multi-session.md §2 still asks to message all peers before a hook change" || ok "multi-session.md §2 hook/install announcements follow busy-only"
 grep -qF 'lock-gate.sh' "$H/CLAUDE.md"grep -qF 'lock-gate.sh' "$H/CLAUDE.md" && ok "CLAUDE.md Hooks table names lock-gate.sh" || fail "CLAUDE.md Hooks table lacks lock-gate.sh"
 
+echo "== 2f. Review minors (2026-10-21) =="
+for a in tester repro-driver incident-investigator research-lead; do
+  grep -qF 'dispatcher_session' "$H/agents/$a.md" && ok "$a.md knows dispatcher_session (owner's own lock isn't a stop)" || fail "$a.md lacks dispatcher_session"
+done
+grep -qF 'dispatcher_session' "$H/rules/multi-session.md" && ok "multi-session.md tells holders to pass dispatcher_session" || fail "multi-session.md lacks dispatcher_session"
+grep -qF -- '- **What:**' "$H/rules/multi-session.md" && ok "multi-session.md defines the '- **What:**' line" || fail "multi-session.md never defines '- **What:**'"
+grep -qF 'start and expected end (ICT)' "$H/rules/multi-session.md" && fail "multi-session.md still asks for a prose end time (drifts from expected_end)" || ok "multi-session.md writes the end once (expected_end)"
+if [ "$H" = "$ROOT/core" ]; then
+  grep -qF 'not auto-loaded' "$ROOT/README.md" && fail "README still says rules are not auto-loaded" || ok "README no longer says rules aren't auto-loaded"
+  for tok in 'guides/' 'retire' 'lock-gate.sh' 'load: always'; do grep -qF -- "$tok" "$ROOT/README.md" && ok "README documents '$tok'" || fail "README lacks '$tok'"; done
+  sed -n 2,25p "$ROOT/install.sh" | grep -qi 'retire' && ok "install.sh header describes retiring" || fail "install.sh header lacks retiring"
+fi
+WT=$(mktemp -d); WRAP=$(awk '/^## Running a step/{f=1} f&&/^```bash$/{g=1;next} g&&/^```$/{exit} g' "$H/agents/runner.md")
+CMDX='read -r x; echo "got:[$x]" # a trailing comment'
+SCRIPT=$(printf '%s' "$WRAP" | REPO="$WT" RUN="$WT/run" CMDX="$CMDX" node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(s.split("<repo_root>").join(process.env.REPO).split("<run_dir>").join(process.env.RUN).split("<n>").join("1").split("<cmd>").join(process.env.CMDX)))')
+WOUT=$(timeout 10 bash -c "$SCRIPT" 2>&1); WRC=$?
+{ [ "$WRC" -eq 0 ] && printf '%s' "$WOUT" | grep -q '^exit=0 ' && grep -qF 'got:[]' "$WT/run/step-1.log" 2>/dev/null; } \
+  && ok "runner wrapper: stdin is /dev/null and a trailing # comment doesn't break it" || fail "runner wrapper broke (rc=$WRC): $(printf '%s' "$WOUT" | head -2 | tr '\n' ' ')"
+rm -rf "$WT"
+
 echo "== 3. Config validity =="
 check ".claude/settings.json parses" node -e "JSON.parse(require('fs').readFileSync('$H/settings.json','utf8'))"
 if [ -f "$ROOT/.mcp.json" ]; then

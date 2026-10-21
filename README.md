@@ -24,6 +24,7 @@ production web app, then made project-agnostic.
 | `quote-verify-gate.sh` | `web-reader` citing a quote that isn't a verbatim substring of the raw page (fabricated, garbled or paraphrased) |
 | `sentry-read-gate.sh` | any Sentry MCP catalog operation that isn't read-only |
 | `confluence-draft-gate.sh` | the research lead writing anything to Confluence but an unpublished draft |
+| `lock-gate.sh` | while a measurement lock exists, it **asks** before another session runs a heavy command (builds, servers, installs, Lighthouse); the lock's owner and its own agents pass, so no idle session needs waking with a message |
 
 `core/scripts/harness-check.sh` re-proves all of it: deny/allow matrices for each hook (with
 positive controls), contract linters between agent files and the workflow rules, tool-boundary
@@ -70,7 +71,8 @@ bash ~/claude-code-harness/install.sh --doctor /path/to/your-repo
 
 `.claude/.harness-manifest` records the hash of every installed file. `--update` replaces only
 files you haven't edited; an edited file is kept and the new version lands next to it as
-`<file>.harness-new` for you to merge. `--doctor` lists edited, missing and outdated files and
+`<file>.harness-new` for you to merge. A file that left core is **retired** to `.claude/.harness-retired/<version>/` when unedited
+(an edited one is kept, with a warning), so a moved rule stops loading. `--doctor` lists edited, missing and outdated files and
 runs harness-check.
 
 ## Layout
@@ -79,7 +81,11 @@ runs harness-check.
 core/                 installed to <repo>/.claude/
   CLAUDE.md           entry point: index of rules, agents, hooks
   agents/ commands/   the two teams and their slash commands
-  rules/              conventions the agents read (not auto-loaded; indexed in CLAUDE.md)
+  rules/              conventions. Claude Code loads every rule into every session and subagent,
+                      so each declares a class: `load: always`, or `paths:` (loads once a
+                      matching file is touched)
+  guides/             task-specific contracts (research, feature workflow, review), Read only by
+                      the agents and commands that need them
   hooks/              enforcement + session context; hooks/lib/project-config.js reads project.md
   templates/          spec, findings, capture sheet
   scripts/            harness-check, verify-quote, prune-session

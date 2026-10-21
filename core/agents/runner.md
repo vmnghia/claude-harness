@@ -76,10 +76,13 @@ For step `n`, make **one** Bash call. Its `timeout` is `timeout_s × 1000`. Its 
 this wrapper with `<cmd>` pasted in **character for character**:
 
 ```bash
-cd '<repo_root>' && mkdir -p '<run_dir>' && { s=$EPOCHREALTIME; ( <cmd> ) > '<run_dir>/step-<n>.log' 2>&1; rc=$?; echo "exit=$rc duration_s=$(awk -v a="$s" -v b="$EPOCHREALTIME" 'BEGIN{printf "%.2f", b-a}') lines=$(wc -l < '<run_dir>/step-<n>.log')"; [ "$rc" -eq 0 ] || tail -n 20 '<run_dir>/step-<n>.log'; }
+cd '<repo_root>' && mkdir -p '<run_dir>' && { s=$EPOCHREALTIME; ( <cmd>
+) < /dev/null > '<run_dir>/step-<n>.log' 2>&1; rc=$?; echo "exit=$rc duration_s=$(awk -v a="$s" -v b="$EPOCHREALTIME" 'BEGIN{printf "%.2f", b-a}') lines=$(wc -l < '<run_dir>/step-<n>.log')"; [ "$rc" -eq 0 ] || tail -n 20 '<run_dir>/step-<n>.log'; }
 ```
 
-- The wrapper is the **only** text you may add around a command. It is fixed: it enters
+- The wrapper is two lines, and it is the **only** text you may add around a command. stdin is
+  `/dev/null`, so a command that prompts fails instead of hanging until the timeout. The newline
+  before `)` lets a command end in a `# comment`. It needs bash 5+ (`$EPOCHREALTIME`). It enters
   `repo_root` first (so a wrong root fails before any folder is created), creates the run
   folder, starts every step at the repo root, logs the output, times the step, and on a non-zero
   exit prints the log's last 20 lines.

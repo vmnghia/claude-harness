@@ -79,7 +79,9 @@ file:
   - `owner_session: <id>`: copy your own id from the `session=` field of the `[harness]`
     session-start line
   - `owner_name: <your ListAgents name>`
-  - `expected_end: <ISO-8601 with offset>`, e.g. `2026-10-21T11:15:00+07:00`
+  - `expected_end: <ISO-8601 with offset>`, e.g. `2026-10-21T11:15:00+07:00`. The end is written
+    only here, so the gate, the session-start line and readers all agree
+  - `- **What:** <what is measured>`: the gate quotes it in every ask
   - A session that was resumed, cleared or compacted re-checks its `session=`, and rewrites
     `owner_session` if the id changed.
 - **`hooks/lock-gate.sh` enforces it.** While the lock exists, any other session's heavy command
@@ -89,7 +91,7 @@ file:
   command at all. The session-start line shows any active lock.
 - **Contents:**
   - the holding session's name + ticket, and what's being measured
-  - start and expected end (ICT)
+  - the start time (the end lives in `expected_end:` above, never in prose)
   - a DON'T list (the §2 resources it needs quiet) and a SAFE list (what peers can do meanwhile)
   - a progress log path
   - the staleness rule: "if this still exists after <end + 1 h>, ask the owner"
@@ -97,6 +99,9 @@ file:
   1. creates it **before** the first build/run
   2. messages only the **`busy`** peers with the path and the end time; idle ones meet the gate
      instead
+  - while holding it, puts `dispatcher_session: <your session= id>` in every brief to tester,
+    repro-driver or incident-investigator (directly, or through `/research`), so your own agents
+    don't stop on your own lock
   3. deletes it when done. That is the release: no "machine free" messages any more
   4. updates `expected_end` if the session overruns (the gate reads the new value)
   5. never edits files the running measurement reads, **including its own driver script**:

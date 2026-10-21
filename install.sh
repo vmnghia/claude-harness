@@ -10,6 +10,8 @@
 #   --update   re-copies core. A file whose hash still matches the manifest (nobody edited it) is
 #              replaced; an edited file is kept, and the new version is written next to it as
 #              <file>.harness-new for you to merge.
+#              A file that left core is retired (moved) to .claude/.harness-retired/<version>/
+#              when unedited; an edited one is kept, with a warning.
 #   --doctor   reports edited, missing and outdated files against the manifest and this core, then
 #              runs the installed harness-check.
 #

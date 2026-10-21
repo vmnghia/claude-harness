@@ -51,7 +51,8 @@ goal · url · env · build_mode · variant · device · steps · reproduced_whe
 2. **Preconditions.** Any failure here returns before touching the page:
    - Local env: `ss -ltnp` must show a listener on the brief URL's port (`project.md`
      `dev_ports`). None → `AWAITING_HUMAN`, `action: "start the dev server (<url>), then resume"`.
-   - `.claude/runs/MEASUREMENT-IN-PROGRESS.md` exists → `AWAITING_HUMAN`,
+   - `.claude/runs/MEASUREMENT-IN-PROGRESS.md` exists and none of its `owner_session:` lines equals the brief's `dispatcher_session` (a match means the
+     lock is your dispatcher's own: proceed) → `AWAITING_HUMAN`,
      `action: "wait until <owner from the lock>'s measurement lock is gone, then resume"`.
    - `list_pages` fails, or the chrome-devtools profile is held by another session →
      `AWAITING_HUMAN`, `action: "free the chrome-devtools browser (close the other session's
