@@ -23,6 +23,7 @@ This change makes the lock **enforce itself**, so idle peers never need waking.
 | `ListAgents` shows `idle`/`busy` and "started X ago" (the session's start), never last activity. No peer→transcript mapping is exposed (no open file, no session-id env var) | ListAgents output; `/proc/<pid>/fd` and `environ` |
 | PreToolUse and SessionStart hooks receive `session_id`. A **subagent's** tool call carries its parent's `session_id`, plus its own `agent_id` | hook log probe |
 | A PreToolUse `permissionDecision: "ask"` prompts the user in an interactive session. In a non-interactive one (`claude -p`) the command doesn't run, even with Bash in `--allowedTools` | `ask` probe: no marker file written |
+| **Interactive** sessions really pause on the gate's `ask`, in **default and auto** mode (auto mode's classifier does not answer it). After the lock is removed, the same command runs unprompted | the owner's manual check, 2026-10-21 (rollout Task 5 step 7) |
 
 ## Decisions (owner, 2026-10-21)
 
