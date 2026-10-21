@@ -287,6 +287,24 @@ if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then
   rm -rf "$IT5"
 fi
 
+echo "== 2h. Review minors, round 3 (2026-10-21) =="
+RT=$(mktemp -d); mkdir -p "$RT/.claude/hooks/lib" "$RT/.claude/runs"; cp "$H/hooks/lib/project-config.js" "$RT/.claude/hooks/lib/"
+printf '# p\n\n```json harness\n{"heavy_commands": ["^(a+)+$", "yarn build"]}\n```\n' > "$RT/.claude/project.md"
+printf 'owner_session: X\nowner_name: o\nexpected_end: 2099-01-01T00:00:00Z\n' > "$RT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
+T0=$SECONDS; printf '{"session_id":"Y","tool_input":{"command":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!"}}' | CLAUDE_PROJECT_DIR="$RT" timeout 30 bash "$H/hooks/lock-gate.sh" >/dev/null 2>&1; EL=$((SECONDS-T0))
+[ "$EL" -le 6 ] && ok "lock-gate: a catastrophic heavy_commands regex is cut off fast (${EL}s; fails open)" || fail "lock-gate stalled ${EL}s on a catastrophic regex"
+RO=$(printf '{"session_id":"Y","tool_input":{"command":"yarn build"}}' | CLAUDE_PROJECT_DIR="$RT" bash "$H/hooks/lock-gate.sh" 2>/dev/null)
+printf '%s' "$RO" | grep -q '"ask"' && ok "lock-gate: a normal heavy command still asks next to a pathological pattern" || fail "lock-gate: normal heavy command not asked: $RO"
+rm -rf "$RT"
+if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then
+  IT6=$(mktemp -d); git -C "$IT6" init -q; bash "$ROOT/install.sh" "$IT6" >/dev/null 2>&1
+  head -3 "$IT6/.claude/.harness-manifest" > "$IT6/m" && mv "$IT6/m" "$IT6/.claude/.harness-manifest"   # header only, no entries
+  UO=$(bash "$ROOT/install.sh" --update "$IT6" 2>&1); URC=$?
+  { [ "$URC" -eq 0 ] && [ "$(grep -vcE '^(#|version |source )' "$IT6/.claude/.harness-manifest")" -gt 0 ]; } \
+    && ok "install --update survives a manifest with no entries (set -euo pipefail)" || fail "install --update on an entry-less manifest: rc=$URC $(printf '%s' "$UO" | tail -1)"
+  rm -rf "$IT6"
+fi
+
 echo "== 3. Config validity =="
 check ".claude/settings.json parses" node -e "JSON.parse(require('fs').readFileSync('$H/settings.json','utf8'))"
 if [ -f "$ROOT/.mcp.json" ]; then
@@ -603,9 +621,12 @@ if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then   # the harness so
     && ok "session-context: deleted installed file → exit 0, not counted as edited" || fail "session-context: deleted-file case"
   IT2=$(mktemp -d); git -C "$IT2" init -q; bash "$ROOT/install.sh" "$IT2" >/dev/null 2>&1
   grep -v '^source ' "$IT2/.claude/.harness-manifest" > "$IT2/m" && mv "$IT2/m" "$IT2/.claude/.harness-manifest"   # legacy 2-line header
+  FIRST=$(grep -vE '^(#|version |source )' "$IT2/.claude/.harness-manifest" | head -1 | awk '{print $2}')
+  echo '<!-- edit -->' >> "$IT2/.claude/$FIRST"
   DOC=$(bash "$ROOT/install.sh" --doctor "$IT2" 2>&1)
+  printf '%s' "$DOC" | grep -qF "edited locally: $FIRST" && ok "install --doctor: legacy manifest's FIRST entry is still checked" || fail "install --doctor skipped the first entry of a legacy manifest ($FIRST)"
   { printf '%s' "$DOC" | grep -q 'manifest: all installed files match' && ! printf '%s' "$DOC" | grep -q 'missing: /'; } \
-    && ok "install --doctor: legacy 2-line manifest parses" || fail "install --doctor: legacy manifest misparsed"
+    || true   # (the edit above makes "all match" false by design; the FIRST-entry check is the real one)
   IT3=$(mktemp -d); git -C "$IT3" init -q; bash "$ROOT/install.sh" "$IT3" >/dev/null 2>&1
   printf '[gone](./zz-nope.md)\n' > "$IT3/.claude/rules/zz-old.md"; printf y > "$IT3/.claude/rules/zz-edited.md"   # a relative link that breaks once retired
   HX=$(printf '[gone](./zz-nope.md)\n' | sha256sum | cut -d' ' -f1)
@@ -615,7 +636,9 @@ if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then   # the harness so
     && ok "install --update: retires an unedited file that left core" || fail "install --update: unedited orphan not retired"
   { [ -e "$IT3/.claude/rules/zz-edited.md" ] && printf '%s' "$UPD" | grep -qF 'edited locally, kept: rules/zz-edited.md'; } \
     && ok "install --update: keeps (and warns about) an edited file that left core" || fail "install --update: edited orphan not kept with a warning"
-  grep -q 'rules/zz-' "$IT3/.claude/.harness-manifest" && fail "install --update: orphans still in the manifest" || ok "install --update: orphans dropped from the manifest"
+  grep -q 'rules/zz-old.md' "$IT3/.claude/.harness-manifest" && fail "install --update: retired orphan still in the manifest" || ok "install --update: retired orphan dropped from the manifest"
+  grep -q 'rules/zz-edited.md' "$IT3/.claude/.harness-manifest" && ok "install --update: edited orphan stays tracked in the manifest" || fail "install --update: edited orphan dropped out of tracking"
+  bash "$ROOT/install.sh" --doctor "$IT3" 2>&1 | grep -q 'left core.*rules/zz-edited.md' && ok "install --doctor keeps reporting the edited orphan" || fail "install --doctor no longer reports the edited orphan"
   (cd "$IT3" && CLAUDE_PROJECT_DIR="$IT3" bash "$IT3/.claude/scripts/harness-check.sh" 2>&1) | grep -q '\.harness-retired/' \
     && fail "installed harness-check scans .harness-retired/ (retired files' links are broken by design)" \
     || ok "installed harness-check ignores .harness-retired/"
@@ -631,7 +654,10 @@ echo "== 5e. Loading classes: always / guides / paths (2026-10-21) =="
 # each rule declares its class: `load: always` (class 1) or `paths:` (class 3); class 2 lives in guides/.
 fm() { awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{exit} f' "$1" 2>/dev/null; }
 fm_has() { fm "$1" | grep -q "^$2:"; }
-paths_of() { fm "$1" | awk '/^paths:/{p=1; sub(/^paths:[ ]*/,""); if($0!=""){gsub(/^"|"$/,""); print}; next} p&&/^[ ]*- /{sub(/^[ ]*- [ ]*/,""); gsub(/^"|"$/,""); print; next} p&&/^[^ ]/{p=0}'; }
+paths_of() { fm "$1" | awk '/^paths:/{p=1; sub(/^paths:[ ]*/,"");
+    if($0 ~ /^\[/){gsub(/^\[|\][ ]*$/,""); n=split($0,a,","); for(i=1;i<=n;i++){g=a[i]; gsub(/^[ ]*"?|"?[ ]*$/,"",g); if(g!="") print g}; p=0; next}   # flow list
+    if($0!=""){gsub(/^"|"$/,""); print}; next}
+  p&&/^[ ]*- /{sub(/^[ ]*- [ ]*/,""); gsub(/^"|"$/,""); print; next} p&&/^[^ ]/{p=0}'; }
 guide_consumers() { local b; b=$(basename "$1"); grep -l -F "$b" $(ls "$H"/agents/*.md "$H"/commands/*.md "$H"/skills/*/SKILL.md "$H/CLAUDE.md" "$H/rules/project/guides-index.md" 2>/dev/null) 2>/dev/null | grep -vxF "$1"; }
 glob_matches() { # glob_matches <root> <glob>... — prints the number of files under <root> matching any glob (ignores node_modules/.next/.git/.claude)
   node -e '
@@ -694,12 +720,14 @@ FX=$(mktemp -d); mkdir -p "$FX/.claude/rules" "$FX/src/sub" "$FX/node_modules"; 
 printf -- '---\nload: always\npaths:\n  - "src/**"\n---\n' > "$FX/.claude/rules/both.md"
 printf -- '---\nload: never\n---\n' > "$FX/.claude/rules/never.md"
 printf -- '---\npaths:\n  - "src/**"\n---\n' > "$FX/.claude/rules/ok3.md"
+printf -- '---\npaths: ["src/**", "lib/**"]\n---\n' > "$FX/.claude/rules/flow.md"   # flow-style YAML list
 printf -- '---\npaths:\n  - "node_modules/**"\n---\n' > "$FX/.claude/rules/nm.md"
 printf -- '---\nload: always\npaths:\n  - "src/**"\n---\n' > "$FX/.claude/rules/git.md"
 FXC=$(class_lint "$FX/.claude")
 [ "$(printf '%s\n' "$FXC" | grep -c FAIL)" = 4 ] && ok "class_lint fixture: both-keys, load: never, and safety-with-paths caught (4 FAILs)" || { fail "class_lint fixture: expected 4 FAILs"; printf '%s\n' "$FXC"; }
 FXP=$( cd "$FX" && paths_lint "$FX/.claude" "$FX" )
 printf '%s\n' "$FXP" | grep -q 'ok3.md: paths: match 1 file' && ok "paths_lint from a cwd with src/ subdirs: globs not shell-expanded" || { fail "paths_lint expanded globs in the shell"; printf '%s\n' "$FXP"; }
+printf '%s\n' "$FXP" | grep -q 'flow.md: paths: match 1 file' && ok "paths_lint parses a flow-style list (paths: [\"a\", \"b\"])" || fail "paths_lint can't parse a flow-style paths list"
 printf '%s\n' "$FXP" | grep -q 'nm.md: paths: match no file' && ok "paths_lint: a node_modules-only glob fails" || fail "paths_lint counted node_modules"
 mkdir -p "$FX/.claude/guides/project" "$FX/.claude/templates"; echo x > "$FX/.claude/guides/project/ext-sys.md"
 echo 'see .claude/rules/ext-sys.md' > "$FX/.claude/templates/t.md"; echo '### From `rules/ext-sys.md` (provenance)' > "$FX/.claude/rules/prov.md"

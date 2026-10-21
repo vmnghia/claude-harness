@@ -17,7 +17,9 @@ LOCK_REL="${LOCK_REL:-.claude/runs/MEASUREMENT-IN-PROGRESS.md}"
 case "$LOCK_REL" in /*) LOCK="$LOCK_REL";; *) LOCK="$DIR/$LOCK_REL";; esac   # an absolute path must not silently disable the gate
 [ -f "$LOCK" ] || exit 0
 HEAVY=$(CLAUDE_PROJECT_DIR="$DIR" node "$CFG" heavy_commands 2>/dev/null)
-printf '%s' "$IN" | LOCK="$LOCK" HEAVY="$HEAVY" node -e '
+# A pathological heavy_commands regex can't be interrupted inside node's one thread, so the whole
+# decision is capped at 3 s: a timeout prints nothing, which is an allow (fail-open, but fast).
+printf '%s' "$IN" | LOCK="$LOCK" HEAVY="$HEAVY" timeout 3 node -e '
 const fs = require("fs");
 const DEFAULT = ["\\b(yarn|npm|pnpm)( run)? (build|dev|start|install|ci)\\b", "\\bnext (build|dev|start)\\b",
                  "\\blighthouse\\b", "harness-check\\.sh",

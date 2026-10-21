@@ -107,7 +107,8 @@ update)
       mkdir -p "$(dirname "$RT")"; mv "$DEST/$f" "$RT"
       RET=$((RET+1)); echo "  retired: $f (→ .harness-retired/$VERSION/)"
     else
-      echo "  no longer in core but edited locally, kept: $f (move or delete it yourself)"
+      echo "  no longer in core but edited locally, kept: $f (move or delete it yourself; it still loads if it's a rule)"
+      echo "$h  $f" >> "$TMP"   # stays tracked, so --doctor keeps reporting it until someone acts
     fi
   done < <(man_entries || true)
   merge_settings
@@ -121,6 +122,7 @@ doctor)
   while read -r h f; do
     if [ ! -e "$DEST/$f" ]; then echo "  missing: $f"; ISSUES=$((ISSUES+1))
     elif [ "$(hash "$DEST/$f")" != "$h" ]; then echo "  edited locally: $f"; ISSUES=$((ISSUES+1)); fi
+    if [ -e "$DEST/$f" ] && [ ! -e "$CORE/$f" ]; then echo "  left core (edited locally, kept): $f — move or delete it"; ISSUES=$((ISSUES+1)); fi
     if [ -e "$CORE/$f" ] && [ "$h" != "$(hash "$CORE/$f")" ]; then echo "  outdated (core changed): $f"; fi
   done < <(man_entries)
   core_files | while read -r f; do man_hash "$f" | grep -q . || echo "  new in core, not installed: $f"; done
