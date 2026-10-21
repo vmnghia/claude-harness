@@ -13,7 +13,8 @@ IN=$(cat 2>/dev/null) || exit 0
 DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 CFG="$(dirname "$0")/lib/project-config.js"
 LOCK_REL=$(CLAUDE_PROJECT_DIR="$DIR" node "$CFG" measurement_lock 2>/dev/null)
-LOCK="$DIR/${LOCK_REL:-.claude/runs/MEASUREMENT-IN-PROGRESS.md}"
+LOCK_REL="${LOCK_REL:-.claude/runs/MEASUREMENT-IN-PROGRESS.md}"
+case "$LOCK_REL" in /*) LOCK="$LOCK_REL";; *) LOCK="$DIR/$LOCK_REL";; esac   # an absolute path must not silently disable the gate
 [ -f "$LOCK" ] || exit 0
 HEAVY=$(CLAUDE_PROJECT_DIR="$DIR" node "$CFG" heavy_commands 2>/dev/null)
 printf '%s' "$IN" | LOCK="$LOCK" HEAVY="$HEAVY" node -e '

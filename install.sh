@@ -31,6 +31,9 @@ git -C "$TARGET" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "inst
 VERSION="$(git -C "$SRC" describe --always --dirty 2>/dev/null || echo uncommitted)"
 
 hash() { sha256sum "$1" | cut -d' ' -f1; }
+# The manifest records the source as ~/… when it lives under $HOME, so a tracked manifest doesn't carry
+# one developer's absolute home path (2026-10-21).
+case "$SRC" in "$HOME"/*) SRC_DISP="~/${SRC#"$HOME"/}";; *) SRC_DISP="$SRC";; esac
 core_files() { (cd "$CORE" && find . -type f ! -name settings.json | sed 's|^\./||' | sort); }
 man_hash() { [ -f "$MAN" ] && awk -v p="$1" '$2==p {print $1}' "$MAN"; }
 man_entries() { grep -vE '^(#|version |source )' "$MAN"; }   # "<hash>  <path>" lines; header lines by prefix, so a pre-2026-10-19 2-line header parses too
@@ -54,7 +57,7 @@ merge_settings() { # merge core hook registrations into DEST/settings.json, skip
 }
 
 write_manifest() { # write_manifest <file listing "<hash>  <path>" lines>
-  { echo "# claude-code-harness manifest — do not edit"; echo "version $VERSION"; echo "source $SRC"; cat "$1"; } > "$MAN"
+  { echo "# claude-code-harness manifest — do not edit"; echo "version $VERSION"; echo "source $SRC_DISP"; cat "$1"; } > "$MAN"
 }
 
 case "$MODE" in
@@ -80,6 +83,8 @@ install)
   ;;
 update)
   [ -f "$MAN" ] || { echo "update: no manifest at $MAN. Run a plain install first." >&2; exit 2; }
+  OLD_SRC=$(sed -n 's/^source //p' "$MAN" | head -1)
+  [ -n "$OLD_SRC" ] && [ "$OLD_SRC" != "$SRC_DISP" ] && echo "  source changed: $OLD_SRC → $SRC_DISP (harness edits now belong in the new source)"
   TMP=$(mktemp); NEW=0; UPD=0; KEPT=0
   while read -r f; do
     if [ ! -e "$DEST/$f" ]; then
@@ -98,7 +103,8 @@ update)
     [ -e "$CORE/$f" ] && continue
     [ -e "$DEST/$f" ] || continue
     if [ "$(hash "$DEST/$f")" = "$h" ]; then
-      mkdir -p "$DEST/.harness-retired/$VERSION/$(dirname "$f")"; mv "$DEST/$f" "$DEST/.harness-retired/$VERSION/$f"
+      RT="$DEST/.harness-retired/$VERSION/$f"; k=1; while [ -e "$RT" ]; do RT="$DEST/.harness-retired/$VERSION/$f.$k"; k=$((k+1)); done   # never overwrite an earlier retired copy
+      mkdir -p "$(dirname "$RT")"; mv "$DEST/$f" "$RT"
       RET=$((RET+1)); echo "  retired: $f (→ .harness-retired/$VERSION/)"
     else
       echo "  no longer in core but edited locally, kept: $f (move or delete it yourself)"

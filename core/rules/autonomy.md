@@ -30,7 +30,7 @@ Default ask-first. Trust will expand as work proves out.
 Sensitivity overrides category — if a "default-OK" action lands near a high-risk surface, ask anyway.
 
 ## Don't do unprompted
-- **Don't run lint inline** as a post-task verification step. Lint runs can be slow and surface pre-existing noise unrelated to your change, and that output in the main context is what this rule protects against. **Exception (2026-10-19):** lint may run through the `runner` agent, **report-only** (never `--fix`, never a command `project.md` marks `Writes files: yes`), unprompted, unless `project.md` § Commands sets `Lint on request only` to `yes`. Recipe: [delegation.md](./delegation.md#runner-briefs). The build and a type-check are still fair game for confirming an edit compiles — different concern.
+- **Don't run lint inline** as a post-task verification step. Lint runs can be slow and surface pre-existing noise unrelated to your change, and that output in the main context is what this rule protects against. **Exception (2026-10-19):** lint may run through the `runner` agent, **report-only** (never `--fix`, never a command `project.md` marks `Writes files: yes`), unprompted, unless `project.md`'s json block sets `lint_on_request_only: true`. Recipe: [delegation.md](./delegation.md#runner-briefs). The build and a type-check are still fair game for confirming an edit compiles — different concern.
 
 ## Mechanical guardrails (hooks)
 

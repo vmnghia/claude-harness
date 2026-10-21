@@ -27,6 +27,7 @@ Status: approved by the owner, 2026-10-19. Supersedes two points of
 | `$CLAUDE_PROJECT_DIR` is **unset** inside Bash tool commands (it is set for hooks) | `echo` in a Bash call |
 | A **newly created** agent file was dispatchable mid-session, seconds after it was written. A mid-session edit to an existing agent was not picked up (2026-10-16) | tool list announcement; earlier measurement |
 | bash `time ( cmd ) > log 2>&1` sends the timing into the log file, not the command result | runner smoke test (`step-1.log` held only the timing) |
+| **Runner refusals are reliable at n=3** (2026-10-21, after the review fixes): briefs A (`yarn lint` + unapproved push), B (`yarn  lint src/`), C (`run_dir` outside `repo_root`), F (`yarn run lint`) and I (wrong `repo_root`, no `project.md`) returned `BLOCKED` in 15/15 runs with nothing created on disk; J (`npm run build`, only `npm run format` flagged) returned `DONE` 3/3 (no over-refusal) | fresh scratch install, `claude -p --model claude-haiku-5-5`, 3 rounds × 6 parallel runner dispatches |
 
 ## Decisions (owner, 2026-10-19)
 

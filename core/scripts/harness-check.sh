@@ -247,6 +247,46 @@ WOUT=$(timeout 10 bash -c "$SCRIPT" 2>&1); WRC=$?
   && ok "runner wrapper: stdin is /dev/null and a trailing # comment doesn't break it" || fail "runner wrapper broke (rc=$WRC): $(printf '%s' "$WOUT" | head -2 | tr '\n' ' ')"
 rm -rf "$WT"
 
+echo "== 2g. Review minors, round 2 (2026-10-21) =="
+# runner M6: rule labels + one fact per line
+EST=$(mktemp -d); cat > "$EST/r.json" <<JSON
+[{"filePath":"$ROOT/src/w.ts","errorCount":1,"warningCount":1,"messages":[
+  {"ruleId":null,"severity":1,"message":"File ignored because of a matching ignore pattern","line":0,"column":0},
+  {"ruleId":"no-undef","severity":2,"message":"first line\nsecond line","line":2,"column":1}]}]
+JSON
+EO=$(node "$H/scripts/eslint-summary.js" "$EST/r.json" src/w.ts 2>&1); rm -rf "$EST"
+printf '%s\n' "$EO" | grep -qxF 'RULE (no rule) errors=0 warnings=1' && ok "eslint-summary: a null-rule warning is '(no rule)', not '(parse error)'" || fail "eslint-summary null-rule label: $EO"
+printf '%s\n' "$EO" | grep -qxF 'CHANGED_ERROR src/w.ts:2:1 no-undef first line second line' && ok "eslint-summary: multi-line message collapsed to one line" || fail "eslint-summary multi-line message"
+# runner M10: lint opt-out is a json key, not a Commands row
+if [ "$H" = "$ROOT/core" ]; then
+  grep -qF '"lint_on_request_only"' "$ROOT/project-template/project.md" && ok "template json has lint_on_request_only" || fail "template json lacks lint_on_request_only"
+  grep -qF '| Lint on request only |' "$ROOT/project-template/project.md" && fail "template still stores the lint opt-out as a Commands row" || ok "template Commands table holds commands only"
+fi
+# load-budget M6: consumers that can read
+grep -E '^\| \[research-workflow\.md\]' "$H/CLAUDE.md" | grep -q 'web-reader' && fail "CLAUDE.md lists web-reader (no Read tool) as a research-workflow consumer" || ok "CLAUDE.md guide consumers can all Read"
+# lock M1: the lock= field is a snapshot
+grep -qF 'snapshot' "$H/rules/multi-session.md" && ok "multi-session.md says the lock= field is a session-start snapshot" || fail "multi-session.md lacks the snapshot caveat"
+# lock M3 + M6: absolute lock path; missing session_id
+AT=$(mktemp -d); mkdir -p "$AT/.claude/hooks/lib" "$AT/elsewhere"; cp "$H/hooks/lib/project-config.js" "$AT/.claude/hooks/lib/"
+printf '# p\n\n```json harness\n{"measurement_lock": "%s/elsewhere/LOCK.md"}\n```\n' "$AT" > "$AT/.claude/project.md"
+printf 'owner_session: X\nowner_name: abs-owner\nexpected_end: 2099-01-01T00:00:00Z\n' > "$AT/elsewhere/LOCK.md"
+AO=$(printf '{"session_id":"Y","tool_input":{"command":"yarn build"}}' | CLAUDE_PROJECT_DIR="$AT" bash "$H/hooks/lock-gate.sh" 2>/dev/null)
+printf '%s' "$AO" | grep -q '"ask"' && ok "lock-gate honours an absolute measurement_lock path" || fail "lock-gate ignored an absolute measurement_lock path"
+AS=$(printf '{"session_id":"Y"}' | CLAUDE_PROJECT_DIR="$AT" bash "$H/hooks/session-context.sh" 2>/dev/null)
+printf '%s' "$AS" | grep -q 'lock=abs-owner' && ok "session-context shows a lock at an absolute path" || fail "session-context missed the absolute-path lock: $AS"
+NO=$(printf '{"tool_input":{"command":"yarn build"}}' | CLAUDE_PROJECT_DIR="$AT" bash "$H/hooks/lock-gate.sh" 2>/dev/null)
+{ printf '%s' "$NO" | grep -q '"ask"' && ! printf '%s' "$NO" | grep -q 'undefined'; } && ok "lock-gate: no session_id → ask, no 'undefined' in the text" || fail "lock-gate missing session_id: $NO"
+rm -rf "$AT"
+if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then
+  # runner M8: source change is announced; load M3: retiring twice keeps both copies
+  IT5=$(mktemp -d); git -C "$IT5" init -q; bash "$ROOT/install.sh" "$IT5" >/dev/null 2>&1
+  sed -i '3s|.*|source ~/some-other-harness|' "$IT5/.claude/.harness-manifest"
+  bash "$ROOT/install.sh" --update "$IT5" 2>&1 | grep -q 'source changed' && ok "install --update announces a changed harness source" || fail "install --update silently switched the harness source"
+  for i in 1 2; do printf 'gone\n' > "$IT5/.claude/rules/zz-twice.md"; printf '%s  rules/zz-twice.md\n' "$(printf 'gone\n' | sha256sum | cut -d' ' -f1)" >> "$IT5/.claude/.harness-manifest"; bash "$ROOT/install.sh" --update "$IT5" >/dev/null 2>&1; done
+  [ "$(find "$IT5/.claude/.harness-retired" -name 'zz-twice.md*' | wc -l)" = 2 ] && ok "retiring the same path twice into one version keeps both copies" || fail "a second retire overwrote the first copy"
+  rm -rf "$IT5"
+fi
+
 echo "== 3. Config validity =="
 check ".claude/settings.json parses" node -e "JSON.parse(require('fs').readFileSync('$H/settings.json','utf8'))"
 if [ -f "$ROOT/.mcp.json" ]; then
@@ -502,7 +542,7 @@ check "delegation.md: DONE doesn't mean the checks passed" grep -qF "doesn't mea
 check "delegation.md lint recipe includes untracked files" grep -qF 'git ls-files --others --exclude-standard' "$H/rules/delegation.md"
 check "delegation.md has '## Runner briefs'" grep -qxF '## Runner briefs' "$H/rules/delegation.md"
 check "autonomy.md scopes lint to the runner" grep -qF 'through the `runner` agent' "$H/rules/autonomy.md"
-check "autonomy.md names the 'Lint on request only' opt-out" grep -qF 'Lint on request only' "$H/rules/autonomy.md"
+check "autonomy.md names the lint_on_request_only opt-out" grep -qF 'lint_on_request_only' "$H/rules/autonomy.md"
 check "CLAUDE.md documents rules/project/" grep -qF 'rules/project/' "$H/CLAUDE.md"
 check "CLAUDE.md documents paths: frontmatter" grep -qF 'paths:' "$H/CLAUDE.md"
 grep -qF 'not** auto-loaded' "$H/CLAUDE.md" && fail "CLAUDE.md still claims rules are not auto-loaded (measured false 2026-10-19)" || ok "CLAUDE.md no longer claims rules aren't auto-loaded"
@@ -549,10 +589,10 @@ rm -rf "$ET"
 if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then   # the harness source repo only: never an adopter's own install.sh (2026-10-19)
   IT=$(mktemp -d); git -C "$IT" init -q
   bash "$ROOT/install.sh" "$IT" >/dev/null 2>&1
-  sed -n 3p "$IT/.claude/.harness-manifest" 2>/dev/null | grep -q '^source /' && ok "install: manifest line 3 records 'source <path>'" || fail "install: manifest has no 'source' line 3"
+  sed -n 3p "$IT/.claude/.harness-manifest" 2>/dev/null | grep -qE '^source (~/|/)' && ok "install: manifest line 3 records 'source <path>'" || fail "install: manifest has no 'source' line 3"
   sc() { CLAUDE_PROJECT_DIR="$IT" bash "$IT/.claude/hooks/session-context.sh" 2>/dev/null; }
   sc | grep -q 'harness_edited=0' && ok "session-context: clean install → harness_edited=0" || fail "session-context: no harness_edited=0 on a clean install"
-  sc | grep -q 'harness_source=/' && ok "session-context: prints harness_source" || fail "session-context: no harness_source"
+  sc | grep -qE 'harness_source=(~/|/)' && ok "session-context: prints harness_source" || fail "session-context: no harness_source"
   echo '<!-- local edit -->' >> "$IT/.claude/rules/git.md"
   sc | grep -q 'harness_edited=1' && ok "session-context: one edited file → harness_edited=1" || fail "session-context: edit not counted"
   mv "$IT/.claude/.harness-manifest" "$IT/m.bak"; OUT=$(sc); RC=$?

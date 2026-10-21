@@ -41,6 +41,10 @@ function matchesChanged(relPath, arg) {
 
 const rel = (abs) => path.relative(ROOT, abs).split(path.sep).join('/')
 const isError = (m) => m.severity === 2
+// A null ruleId is a parse error only when fatal; otherwise it's a rule-less notice (e.g. "file ignored").
+const ruleOf = (m) => m.ruleId || (m.fatal ? '(parse error)' : '(no rule)')
+// One fact per line: collapse a multi-line message.
+const oneLine = (t) => String(t).replace(/\s+/g, ' ').trim()
 
 let errors = 0
 let warnings = 0
@@ -55,7 +59,7 @@ for (const r of results) {
   warnings += r.warningCount
   for (const m of r.messages) {
     if (m.fatal) fatal++
-    const id = m.ruleId || '(parse error)'
+    const id = ruleOf(m)
     const tally = byRule.get(id) || { errors: 0, warnings: 0 }
     isError(m) ? tally.errors++ : tally.warnings++
     byRule.set(id, tally)
@@ -83,7 +87,7 @@ for (const { file, r } of changed) {
   console.log(`CHANGED ${file} errors=${r.errorCount} warnings=${r.warningCount}`)
   const errs = r.messages.filter(isError)
   for (const m of errs.slice(0, MAX_CHANGED_ERRORS)) {
-    console.log(`CHANGED_ERROR ${file}:${m.line}:${m.column} ${m.ruleId || '(parse error)'} ${m.message}`)
+    console.log(`CHANGED_ERROR ${file}:${m.line}:${m.column} ${ruleOf(m)} ${oneLine(m.message)}`)
   }
   if (errs.length > MAX_CHANGED_ERRORS) console.log(`CHANGED_ERROR_MORE ${file} ${errs.length - MAX_CHANGED_ERRORS}`)
 }

@@ -55,7 +55,7 @@ reads it when the trigger applies.
 
 | Guide | Consumers | Main session reads it when… |
 |---|---|---|
-| [research-workflow.md](./guides/research-workflow.md) | `/research`, research-lead, incident-investigator, repro-driver, searcher, web-reader, designer, writer | running or resuming `/research`, or dispatching a research agent directly |
+| [research-workflow.md](./guides/research-workflow.md) | `/research`, research-lead, incident-investigator, repro-driver, searcher, designer, writer | running or resuming `/research`, or dispatching a research agent directly |
 | [ai-workflow.md](./guides/ai-workflow.md) | `/feature-flow`, `/planner`, planner, coder, tester, reviewer | running the feature workflow or dispatching one of its agents |
 | [code-review.md](./guides/code-review.md) | reviewer | triaging review comments (CodeRabbit or human) |
 | [agent-skills.md](./guides/agent-skills.md) | — | answering "can you do X / is there a skill for X", or recommending skills |

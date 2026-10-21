@@ -111,6 +111,8 @@ file:
     If asked, tell the user why your command can't touch the measurement, or wait. **An ask is
     policy:** never rephrase the command to slip past the match.
   - **Never edit a peer's lock, including its `owner_session` line.** Only the holder updates it.
+  - The `lock=` field on your session-start line is a **snapshot** from when your session started.
+    Before waiting on a lock, check that the lock file still exists.
   - to wait, run a background `until [ ! -e <lock> ] …` watcher with the staleness deadline as a second
     exit (one notification, no polling loops in chat)
 - **When the lock disappears, check the machine before trusting it:** `ss -ltnp` on the shared ports

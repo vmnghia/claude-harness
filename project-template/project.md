@@ -11,7 +11,8 @@ step and say so; they never guess a value.
   "test_runner_marker": "",
   "dev_ports": [3000],
   "measurement_lock": ".claude/runs/MEASUREMENT-IN-PROGRESS.md",
-  "heavy_commands": null
+  "heavy_commands": null,
+  "lint_on_request_only": false
 }
 ```
 
@@ -21,6 +22,8 @@ step and say so; they never guess a value.
   `vitest.config.*`). Empty: the session hook tries common markers.
 - `dev_ports`: what Coder and Tester check with `ss -ltnp` before building or starting a server.
 - `measurement_lock`: path of the multi-session measurement lock (`rules/multi-session.md`).
+- `lint_on_request_only`: `true` = the `runner` agent lints only when asked; `false` (default) = report-only
+  lint through the runner may run unprompted (`rules/autonomy.md`).
 - `heavy_commands`: regexes (matched against the whole Bash command) that `hooks/lock-gate.sh` asks
   about while another session holds the lock. `null` = the default (builds, dev/start servers,
   installs, Lighthouse, harness-check). A list **replaces** the default, so repeat what you keep
@@ -65,7 +68,6 @@ Where `rules/code-conventions.md` and the agents look for things.
 | Dev server (Tester) | TODO | | no |
 | Tests | TODO or `none` | `none` = Coder reports `test_result: n/a` | no |
 | Lint | TODO | report-only, never `--fix`. Through the `runner` agent: `<lint> -f json -o <run_dir>/eslint.json` (allowed exit 0/1), then `node .claude/scripts/eslint-summary.js <run_dir>/eslint.json <changed paths…>` | no |
-| Lint on request only | no | `yes` = the runner lints only when asked; `no` = it may lint unprompted | no |
 | Codegen | none | | no |
 
 `Writes files: yes` marks a command that rewrites files in the working tree (an auto-fixing lint, a
