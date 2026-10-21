@@ -134,6 +134,99 @@ cgate 2 "other write tool"             executeWrite '{"name":"createConfluencePa
 printf 'not-json' | "$CGATE" >/dev/null 2>&1; [ $? -eq 2 ] && ok "[confluence] malformed JSON → deny" || fail "[confluence] malformed JSON → deny"
 printf '' | "$CGATE" >/dev/null 2>&1; [ $? -eq 2 ] && ok "[confluence] empty input → deny" || fail "[confluence] empty input → deny"
 
+echo "== 2e. lock-gate matrix (2026-10-21) =="
+# Asks before a heavy command when ANOTHER session holds the measurement lock. Owner = caller's
+# session_id equals the lock's owner_session (subagents carry the parent's id). Fail-open on errors.
+LG="$H/hooks/lock-gate.sh"
+check "lock-gate.sh exists+executable" test -x "$LG"
+check "lock-gate.sh bash syntax" bash -n "$LG"
+LGT=$(mktemp -d); mkdir -p "$LGT/.claude/runs" "$LGT/.claude/hooks/lib"; cp "$H/hooks/lib/project-config.js" "$LGT/.claude/hooks/lib/"
+LOCKF="$LGT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
+lgcfg() { if [ -n "$1" ]; then printf '# p\n\n```json harness\n{"heavy_commands": %s}\n```\n' "$1" > "$LGT/.claude/project.md"; else rm -f "$LGT/.claude/project.md"; fi; }
+iso() { MIN="$1" OFF="${2:-0}" node -e 'const off=Number(process.env.OFF||0);const d=new Date(Date.now()+Number(process.env.MIN)*60000);if(!off){console.log(d.toISOString());process.exit()}
+  const l=new Date(d.getTime()+off*60000),p=n=>String(n).padStart(2,"0");console.log(`${l.getUTCFullYear()}-${p(l.getUTCMonth()+1)}-${p(l.getUTCDate())}T${p(l.getUTCHours())}:${p(l.getUTCMinutes())}:00+${p(off/60)}:00`)'; }   # numbers via env: node reads a leading '-120' argument as an option
+mklock() { # mklock <owner_session|-> <expected_end|-> — writes the lock file; '-' omits the line
+  { echo "# MEASUREMENT IN PROGRESS"; echo "- **What:** fixture build timing"; echo "owner_name: peer-session"
+    [ "$1" != "-" ] && printf 'owner_session: %s\n' "$1"; [ "$2" != "-" ] && echo "expected_end: $2"; } > "$LOCKF"; }
+LGOUT=""
+lg() { # lg <allow|ask> <label> <session_id> <agent_id|-> <command> [raw-stdin]
+  local exp="$1" label="$2" in got
+  if [ -n "${6:-}" ]; then in="$6"; else
+    in=$(node -e 'const [s,a,c]=process.argv.slice(1);const j={session_id:s,permission_mode:"default",tool_name:"Bash",tool_input:{command:c}};if(a!=="-")j.agent_id=a;process.stdout.write(JSON.stringify(j))' "$3" "$4" "$5"); fi
+  LGOUT=$(printf '%s' "$in" | CLAUDE_PROJECT_DIR="$LGT" "$LG" 2>/dev/null); local rc=$?
+  if [ -z "$LGOUT" ] && [ "$rc" -eq 0 ]; then got=allow
+  elif printf '%s' "$LGOUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.exit(JSON.parse(s).hookSpecificOutput.permissionDecision==="ask"?0:1))' 2>/dev/null; then got=ask
+  else got="other(rc=$rc)"; fi
+  [ "$got" = "$exp" ] && ok "[$label] → $got" || fail "[$label] → $got (expected $exp)"
+}
+has() { printf '%s' "$LGOUT" | grep -qF -- "$1"; }
+lgcfg ""; rm -f "$LOCKF"
+lg allow "a no lock → allow"                                 X - "yarn build"
+mklock X "$(iso 30)"
+lg allow "b lock, non-heavy command → allow"                 Y - "ls -la"
+lg allow "c owner's own heavy command → allow"               X - "yarn build"
+lg allow "d owner's subagent (agent_id set) → allow"         X agentA "yarn build"
+lg ask   "e foreign heavy command → ask"                     Y - "yarn build"
+{ has "peer-session" && has "Only the session named peer-session" && has "fixture build timing"; } && ok "[e] reason names the owner and what's measured" || fail "[e] reason incomplete: $LGOUT"
+mklock - "$(iso 30)"
+lg ask   "f lock without owner_session → ask, even its writer" X - "yarn build"
+mklock X "$(iso -120)"
+lg ask   "g stale lock (Z) → ask"                            Y - "yarn build"
+has "STALE" && ok "[g] reason says STALE" || fail "[g] no STALE in: $LGOUT"
+mklock X -
+lg ask   "h no expected_end → ask"                           Y - "yarn build"
+{ has "end unknown" && ! has "STALE"; } && ok "[h] 'end unknown', not STALE" || fail "[h] reason: $LGOUT"
+lg allow "i malformed stdin → allow (fail-open)"             - - - '{not json'
+mklock X "$(iso 30)"; lgcfg '["my-perf\\.sh"]'
+lg ask   "j project heavy_commands: custom script → ask"     Y - "bash my-perf.sh"
+lg allow "j project list replaces the default: yarn build → allow" Y - "yarn build"
+lgcfg ""
+lg ask   "k whole-string match: a commit message naming yarn build → ask" Y - 'git commit -m "yarn build fix"'
+printf '# L\nowner_name: peer-session\nowner_session: X  \r\nexpected_end: %s\n' "$(iso 30)" > "$LOCKF"
+lg allow "l owner_session with trailing spaces + CR still matches" X - "yarn build"
+mklock X "$(iso 30)"; lgcfg '["(bad", "yarn build"]'
+lg ask   "m an invalid regex entry is skipped, the rest still apply" Y - "yarn build"
+lgcfg ""; mklock X "$(iso 30 420)"
+lg ask   "n +07:00 end 30 min ahead → ask"                   Y - "yarn build"
+has "STALE" && fail "[n] +07:00 end in the future reported STALE" || ok "[n] +07:00 end in the future is not stale"
+printf '# L\n- owner_session: <your id here>\nowner_name: peer-session\nowner_session: X\nexpected_end: %s\n' "$(iso 30)" > "$LOCKF"
+lg allow "o two owner_session lines: the matching one counts (owner not asked)" X - "yarn build"
+lg ask   "o two owner_session lines: a non-owner is still asked" Y - "yarn build"
+has "If you hold this lock, set" && fail "[o] ask text still invites setting owner_session" || ok "[o] ask text no longer invites setting owner_session"
+{ has "Only the session named" && has "ask the user"; } && ok "[o] ask text is identity-tied and points at the user" || fail "[o] ask text: $LGOUT"
+mklock X "$(iso 30)"
+lg ask   "q bare yarn (install) → ask"                       Y - "yarn"
+lg ask   "q npm i → ask"                                     Y - "npm i"
+lg ask   "q yarn add x → ask"                                Y - "yarn add lodash"
+lg allow "q yarn --version is not an install"                Y - "yarn --version"
+rm -rf "$LGT"
+
+node -e 'const s=require(process.argv[1]);process.exit(s.hooks.PreToolUse.some(g=>g.matcher==="Bash"&&g.hooks.some(h=>/lock-gate\.sh/.test(h.command)))?0:1)' "$H/settings.json" \
+  && ok "settings.json registers lock-gate.sh in the Bash group" || fail "settings.json doesn't register lock-gate.sh"
+PTPL="$ROOT/project-template/project.md"
+[ "$H" = "$ROOT/core" ] && { grep -qF '"heavy_commands"' "$PTPL" && ok "project template json documents heavy_commands" || fail "project template json lacks heavy_commands"; }
+SCT=$(mktemp -d); mkdir -p "$SCT/.claude/runs"; SCH="$H/hooks/session-context.sh"
+sc2() { printf '%s' "$1" | CLAUDE_PROJECT_DIR="$SCT" bash "$SCH" 2>/dev/null; }
+O=$(sc2 '{"session_id":"abc","source":"startup"}'); printf '%s' "$O" | grep -q 'session=abc' && ok "session-context prints session=<id> from its stdin" || fail "session-context: no session=abc in: $O"
+printf '%s' "$O" | grep -q 'lock=' && fail "session-context prints lock= with no lock" || ok "session-context: no lock → no lock= field"
+printf 'owner_session: abc\nowner_name: n\nexpected_end: 2099-01-01T00:00:00Z\n' > "$SCT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
+O=$(sc2 '{"session_id":"abc","source":"resume"}'); { printf '%s' "$O" | grep -q 'lock=n' && printf '%s' "$O" | grep -q '(yours)'; } && ok "session-context shows the lock, marked (yours) for its owner" || fail "session-context lock field: $O"
+O=$(sc2 '{not json'); RC=$?; { [ "$RC" -eq 0 ] && printf '%s' "$O" | grep -q '^\[harness\]'; } && ok "session-context: malformed stdin still prints its line, exit 0" || fail "session-context malformed stdin: rc=$RC $O"
+T0=$SECONDS; CLAUDE_PROJECT_DIR="$SCT" timeout 15 bash "$SCH" >/dev/null 2>&1 < <(sleep 20); EL=$((SECONDS-T0))   # <(…): stdin stays open, and bash doesn't wait for it (a pipe would)
+[ "$EL" -lt 5 ] && ok "session-context returns fast on an open, silent stdin (${EL}s)" || fail "session-context blocked on an open stdin (${EL}s) — it must never hang a session start"
+printf 'owner_session: old\nowner_name: n\nowner_session: abc\nexpected_end: 2099-01-01T00:00:00Z\n' > "$SCT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
+O=$(sc2 '{"session_id":"abc","source":"clear"}'); printf '%s' "$O" | grep -q '(yours)' && ok "session-context: (yours) when any owner_session line matches" || fail "session-context two-line owner: $O"
+rm -rf "$SCT"
+
+MSR="$H/rules/multi-session.md"
+for tok in owner_session expected_end busy lock-gate.sh; do grep -qF "$tok" "$MSR" && ok "multi-session.md names '$tok'" || fail "multi-session.md lacks '$tok'"; done
+grep -nE 'messages? .*machine free' "$MSR" | grep -viE 'no longer|never|don.t|do not' | grep -q . && fail "multi-session.md still tells the holder to message 'machine free'" || ok "multi-session.md no longer asks for 'machine free' messages"
+grep -qF 'no hook enforces it' "$MSR" && fail "multi-session.md still says no hook enforces it" || ok "multi-session.md no longer claims no hook enforces it"
+grep -qF 'Never edit a peer' "$MSR" && ok "multi-session.md forbids editing a peer's lock (incl. owner_session)" || fail "multi-session.md lacks 'Never edit a peer's lock'"
+grep -qF 'on create, message only' "$MSR" && ok "multi-session.md §6 agrees with §3 (busy-only on create)" || fail "multi-session.md §6 contradicts §3 on create messages"
+grep -qE 'Message peers \*\*before\*\* registering' "$MSR" && fail "multi-session.md §2 still asks to message all peers before a hook change" || ok "multi-session.md §2 hook/install announcements follow busy-only"
+grep -qF 'lock-gate.sh' "$H/CLAUDE.md"grep -qF 'lock-gate.sh' "$H/CLAUDE.md" && ok "CLAUDE.md Hooks table names lock-gate.sh" || fail "CLAUDE.md Hooks table lacks lock-gate.sh"
+
 echo "== 3. Config validity =="
 check ".claude/settings.json parses" node -e "JSON.parse(require('fs').readFileSync('$H/settings.json','utf8'))"
 if [ -f "$ROOT/.mcp.json" ]; then

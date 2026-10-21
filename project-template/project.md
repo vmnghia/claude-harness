@@ -10,7 +10,8 @@ step and say so; they never guess a value.
   "shared_branches": ["main", "master", "develop", "release/*"],
   "test_runner_marker": "",
   "dev_ports": [3000],
-  "measurement_lock": ".claude/runs/MEASUREMENT-IN-PROGRESS.md"
+  "measurement_lock": ".claude/runs/MEASUREMENT-IN-PROGRESS.md",
+  "heavy_commands": null
 }
 ```
 
@@ -20,6 +21,10 @@ step and say so; they never guess a value.
   `vitest.config.*`). Empty: the session hook tries common markers.
 - `dev_ports`: what Coder and Tester check with `ss -ltnp` before building or starting a server.
 - `measurement_lock`: path of the multi-session measurement lock (`rules/multi-session.md`).
+- `heavy_commands`: regexes (matched against the whole Bash command) that `hooks/lock-gate.sh` asks
+  about while another session holds the lock. `null` = the default (builds, dev/start servers,
+  installs, Lighthouse, harness-check). A list **replaces** the default, so repeat what you keep
+  and add the project's own measurement scripts.
 
 ## Owner
 

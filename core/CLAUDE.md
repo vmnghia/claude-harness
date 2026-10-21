@@ -85,7 +85,8 @@ don't retry, rephrase or work around it.
 |---|---|---|
 | `git-guard.sh` | PreToolUse(Bash) | denies commits on and pushes from/to shared branches (`project.md` `shared_branches`), plain `--force`, `--no-verify` |
 | `sentry-read-gate.sh` | PreToolUse(Sentry `execute_sentry_tool`) | allows only read-only Sentry catalog operations; fails closed |
-| `session-context.sh` | SessionStart | prints branch, dirty files, newest spec+plan, test-runner presence |
+| `lock-gate.sh` | PreToolUse(Bash) | while a measurement lock exists, **asks** before another session's heavy command (`project.md` `heavy_commands`); the owner (same `session_id`) and its subagents pass; fails open |
+| `session-context.sh` | SessionStart | prints branch, dirty files, newest spec+plan, test-runner presence, harness drift, this session's `session=` id, and any active lock |
 | `confluence-draft-gate.sh` | PreToolUse, **in `research-lead.md`'s frontmatter** | research-lead may write Confluence drafts only |
 | `quote-verify-gate.sh` | Stop, **in `web-reader.md`'s frontmatter** | every quote web-reader cites must be a verbatim substring of its page |
 

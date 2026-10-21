@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # SessionStart hook — orients every session. stdout becomes session context.
 # Additive only; never blocks. Fail-open on any error.
+IN=""; [ -t 0 ] || IN=$(timeout 2 cat 2>/dev/null)   # SessionStart JSON (session_id, source); bounded: an open, silent stdin must never hang session start
 cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" 2>/dev/null || exit 0
 
 BRANCH=$(git branch --show-current 2>/dev/null || echo "?")
@@ -30,5 +31,17 @@ if [ -f "$MAN" ]; then
   DRIFT=" | harness_edited=${EDITED:-0} | harness_source=${HSRC:-unrecorded}"
 fi
 
-echo "[harness] branch=${BRANCH} | dirty_files=${DIRTY} | newest_spec=${SPEC:-none} | plan=${PLAN:-none} | tests=${TESTS}${DRIFT}"
+# This session's id (the lock's owner_session) and any measurement lock (hooks/lock-gate.sh asks
+# non-owners before heavy commands while it exists).
+SID=$(printf '%s' "$IN" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).session_id||"")}catch{}})' 2>/dev/null)
+LOCKF=$(node "$(dirname "$0")/lib/project-config.js" measurement_lock 2>/dev/null); LOCKF="${LOCKF:-.claude/runs/MEASUREMENT-IN-PROGRESS.md}"
+LOCKS=""
+if [ -f "$LOCKF" ]; then
+  LOCKS=$(SID="$SID" node -e 'const l=require("fs").readFileSync(process.argv[1],"utf8");const f=k=>((l.match(new RegExp("^[ \\t>*-]*"+k+":[ \\t]*(.*?)[ \\t\\r]*$","m"))||[])[1]||"").trim();
+    const os=[...l.matchAll(/^[ \t>*-]*owner_session:[ \t]*(.*?)[ \t\r]*$/gm)].map(m=>m[1].trim()),n=f("owner_name")||"unknown",e=f("expected_end"),t=Date.parse(e);
+    const end=e&&!isNaN(t)?e:"end unknown",stale=e&&!isNaN(t)&&Date.now()>t+3600e3;
+    process.stdout.write(" | lock="+n+" until "+end+(stale?" STALE":"")+(process.env.SID&&os.includes(process.env.SID)?" (yours)":""))' "$LOCKF" 2>/dev/null)
+fi
+
+echo "[harness] branch=${BRANCH} | dirty_files=${DIRTY} | newest_spec=${SPEC:-none} | plan=${PLAN:-none} | tests=${TESTS}${DRIFT}${SID:+ | session=$SID}${LOCKS}"
 exit 0
