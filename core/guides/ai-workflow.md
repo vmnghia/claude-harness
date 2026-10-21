@@ -121,10 +121,10 @@ Routing:
 
 ## Branch policy
 
-No agent creates branches, commits, or pushes ([autonomy.md](./autonomy.md)).
+No agent creates branches, commits, or pushes ([autonomy.md](../rules/autonomy.md)).
 Orchestrator branch gate: if the current branch matches `master`, `main`,
 `stable`, `develop`, or `release/*`, warn and ask whether to create a
-feature branch (named per [git.md](./git.md)) or proceed. Shown even with
+feature branch (named per [git.md](../rules/git.md)) or proceed. Shown even with
 `--auto`.
 
 ## Mechanical enforcement (hooks)
@@ -153,7 +153,7 @@ Enforced by subagent frontmatter; inline planner uses main-session tools.
 
 ## Verification rule (inherited)
 
-Tester drives Chrome DevTools MCP per [verification.md](./verification.md):
+Tester drives Chrome DevTools MCP per [verification.md](../rules/verification.md):
 scenario URL from the spec (nothing hardcoded), cookies via
 `evaluate_script`, reload `ignoreCache: true`, pristine SSR via in-page
 `fetch(location.href, {cache:'no-store'})` — never shell `curl`. Respect the
@@ -162,7 +162,7 @@ dev-server restart wait (`project.md` § Dev server). Type-check passing
 
 ## Bug-fix rule (inherited)
 
-For bug specs, Coder follows [bug-fixes.md](./bug-fixes.md): reproduce
+For bug specs, Coder follows [bug-fixes.md](../rules/bug-fixes.md): reproduce
 locally first, implement, re-verify against the same repro. Tester mimics
 the real user flow — no `router.push` shortcuts.
 

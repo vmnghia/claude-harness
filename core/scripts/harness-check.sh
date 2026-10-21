@@ -2,7 +2,7 @@
 # Harness self-check — run after any change to the harness.
 # Hook integrity + deny/allow matrices (in sandboxed temp repos, so results don't depend on your
 # branch or your project.md), config validity, doc drift and dead links, and the contract linters
-# between agent files and rules/ai-workflow.md + rules/research-workflow.md.
+# between agent files and guides/ai-workflow.md + guides/research-workflow.md.
 # Runs from an installed harness (<repo>/.claude/scripts/) or from the harness repo (core/scripts/).
 # Exit 0 = all green; exit 1 = at least one FAIL (each is printed).
 
@@ -156,12 +156,12 @@ else
   ok "no dead Rovo tool names in agents/commands/rules"
 fi
 # Relative links in harness markdown must resolve (project.md may be absent in the harness repo).
-DEAD=$(cd "$H" && find . -name '*.md' -not -path './investigations/*' -not -path './specs/*' -not -path './runs/*' | while read -r f; do
+DEAD=$(cd "$H" && find . -name '*.md' -not -path './investigations/*' -not -path './specs/*' -not -path './runs/*' -not -path './.harness-retired/*' | while read -r f; do
   d=$(dirname "$f"); grep -o -E '\]\((\.{1,2}/[^)#]+)' "$f" | sed 's/](//' | while read -r l; do
     case "$l" in */project.md) continue;; esac; [ -e "$d/$l" ] || echo "$f -> $l"; done; done)
 [ -z "$DEAD" ] && ok "no dead relative links in harness markdown" || { fail "dead relative links:"; echo "$DEAD" | sed 's/^/         /'; }
 echo "== 5. Contract linter (agent files ↔ ai-workflow.md) =="
-WF="$H/rules/ai-workflow.md"
+WF="$H/guides/ai-workflow.md"
 pair() { # pair <token> <agent-file-basename>
   local tok="$1" agent="$H/agents/$2"
   if grep -q "$tok" "$WF" && grep -q "$tok" "$agent"; then
@@ -206,9 +206,9 @@ grep -q "4-agent" "$AGD"/*.md && fail "an agent still says '4-agent' (harness ha
 grep -q 'leave it running' "$AGD/tester.md" && fail "tester still leaves yarn dev running (collides with Coder's build)" || ok "tester stops the server it started"
 
 echo "== 5b. Research contract linter (agent files ↔ research-workflow.md) =="
-RW="$H/rules/research-workflow.md"
+RW="$H/guides/research-workflow.md"
 AG="${HC_AGENTS_DIR:-$H/agents}"
-check "rules/research-workflow.md exists" test -f "$RW"
+check "guides/research-workflow.md exists" test -f "$RW"
 check "ai-workflow.md points to research-workflow.md" grep -q "research-workflow.md" "$WF"
 
 is_stub()  { grep -q '^> \*\*STUB (' "$1"; }
@@ -453,10 +453,111 @@ if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then   # the harness so
   DOC=$(bash "$ROOT/install.sh" --doctor "$IT2" 2>&1)
   { printf '%s' "$DOC" | grep -q 'manifest: all installed files match' && ! printf '%s' "$DOC" | grep -q 'missing: /'; } \
     && ok "install --doctor: legacy 2-line manifest parses" || fail "install --doctor: legacy manifest misparsed"
+  IT3=$(mktemp -d); git -C "$IT3" init -q; bash "$ROOT/install.sh" "$IT3" >/dev/null 2>&1
+  printf '[gone](./zz-nope.md)\n' > "$IT3/.claude/rules/zz-old.md"; printf y > "$IT3/.claude/rules/zz-edited.md"   # a relative link that breaks once retired
+  HX=$(printf '[gone](./zz-nope.md)\n' | sha256sum | cut -d' ' -f1)
+  printf '%s  rules/zz-old.md\n%s  rules/zz-edited.md\n' "$HX" "$HX" >> "$IT3/.claude/.harness-manifest"
+  UPD=$(bash "$ROOT/install.sh" --update "$IT3" 2>&1)
+  { ls "$IT3"/.claude/.harness-retired/*/rules/zz-old.md >/dev/null 2>&1 && [ ! -e "$IT3/.claude/rules/zz-old.md" ]; } \
+    && ok "install --update: retires an unedited file that left core" || fail "install --update: unedited orphan not retired"
+  { [ -e "$IT3/.claude/rules/zz-edited.md" ] && printf '%s' "$UPD" | grep -qF 'edited locally, kept: rules/zz-edited.md'; } \
+    && ok "install --update: keeps (and warns about) an edited file that left core" || fail "install --update: edited orphan not kept with a warning"
+  grep -q 'rules/zz-' "$IT3/.claude/.harness-manifest" && fail "install --update: orphans still in the manifest" || ok "install --update: orphans dropped from the manifest"
+  (cd "$IT3" && CLAUDE_PROJECT_DIR="$IT3" bash "$IT3/.claude/scripts/harness-check.sh" 2>&1) | grep -q '\.harness-retired/' \
+    && fail "installed harness-check scans .harness-retired/ (retired files' links are broken by design)" \
+    || ok "installed harness-check ignores .harness-retired/"
+  rm -rf "$IT3"
   printf '#!/bin/sh\ntouch "$(dirname "$0")/ADOPTER_INSTALL_RAN"\n' > "$IT/install.sh"
   (cd "$IT" && CLAUDE_PROJECT_DIR="$IT" bash "$IT/.claude/scripts/harness-check.sh" >/dev/null 2>&1)
   [ -e "$IT/ADOPTER_INSTALL_RAN" ] && fail "installed harness-check ran the adopter's own install.sh" || ok "installed harness-check never runs an adopter's install.sh"
   rm -rf "$IT" "$IT2"
+fi
+
+echo "== 5e. Loading classes: always / guides / paths (2026-10-21) =="
+# Every rule loads in every session and subagent unless it says otherwise (measured 2026-10-19), so
+# each rule declares its class: `load: always` (class 1) or `paths:` (class 3); class 2 lives in guides/.
+fm() { awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{exit} f' "$1" 2>/dev/null; }
+fm_has() { fm "$1" | grep -q "^$2:"; }
+paths_of() { fm "$1" | awk '/^paths:/{p=1; sub(/^paths:[ ]*/,""); if($0!=""){gsub(/^"|"$/,""); print}; next} p&&/^[ ]*- /{sub(/^[ ]*- [ ]*/,""); gsub(/^"|"$/,""); print; next} p&&/^[^ ]/{p=0}'; }
+guide_consumers() { local b; b=$(basename "$1"); grep -l -F "$b" $(ls "$H"/agents/*.md "$H"/commands/*.md "$H"/skills/*/SKILL.md "$H/CLAUDE.md" "$H/rules/project/guides-index.md" 2>/dev/null) 2>/dev/null | grep -vxF "$1"; }
+glob_matches() { # glob_matches <root> <glob>... — prints the number of files under <root> matching any glob (ignores node_modules/.next/.git/.claude)
+  node -e '
+    const fs=require("fs"),path=require("path"),[root,...globs]=process.argv.slice(1);
+    const rx=g=>new RegExp("^"+g.replace(/[.+^$()|[\]\\]/g,"\\$&").replace(/\{([^}]*)\}/g,(_,a)=>"("+a.split(",").join("|")+")")
+      .replace(/\*\*\//g,"\u0001").replace(/\*\*/g,"\u0002").replace(/\*/g,"[^/]*").replace(/\?/g,"[^/]")
+      .replace(/\u0001/g,"(?:.*/)?").replace(/\u0002/g,".*")+"$");
+    const res=globs.map(rx), skip=new Set(["node_modules",".next",".git",".claude"]); let n=0;
+    (function walk(d,rel){ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
+      for(const e of es){ if(skip.has(e.name)) continue; const r=rel?rel+"/"+e.name:e.name;
+        if(e.isDirectory()) walk(path.join(d,e.name),r); else if(res.some(x=>x.test(r))) n++; } })(root,"");
+    console.log(n)' "$@"
+}
+class_lint() { # class_lint <H>: prints a FAIL line per rule whose loading class is wrong
+  local h="$1" f l p
+  for f in $(find "$h/rules" -name '*.md' 2>/dev/null | sort); do
+    l=$(fm "$f" | grep '^load:' | head -1); p=0; fm_has "$f" paths && p=1
+    if [ -n "$l" ] && [ "$p" = 1 ]; then echo "  FAIL  ${f#$h/}: has both load: and paths: (paths: wins, so it would not always load)"
+    elif [ -n "$l" ] && [ "$l" != "load: always" ]; then echo "  FAIL  ${f#$h/}: '$l' is not a class (only 'load: always')"
+    elif [ -z "$l" ] && [ "$p" = 0 ]; then echo "  FAIL  ${f#$h/}: no class marker (load: always | paths:)"; fi
+  done
+  for f in rules/autonomy.md rules/git.md rules/multi-session.md rules/project/git-release-flow.md; do
+    [ -f "$h/$f" ] || continue
+    { fm "$h/$f" | grep -qx 'load: always' && ! fm_has "$h/$f" paths; } || echo "  FAIL  safety rule $f must be exactly 'load: always' with no paths: (it would stop loading in plain sessions)"
+  done
+}
+stale_lint() { # stale_lint <H>: prints a FAIL line per reference to a guide by a path other than guides/ (links or prose)
+  local h="$1" names
+  names=$(find "$h/guides" -name '*.md' -exec basename {} .md \; 2>/dev/null | sort -u | paste -sd'|')
+  [ -n "$names" ] || return 0
+  grep -rnE "\b($names)\.md" "$h/agents" "$h/commands" "$h/templates" "$h/rules" "$h/skills" "$h/CLAUDE.md" "$h/project.md" 2>/dev/null \
+    | grep -v 'guides/' | grep -vE '^[^:]+:[0-9]+:### From ' | sed "s|^$h/|  FAIL  stale guide path: |" | cut -c1-170
+}
+paths_lint() { # paths_lint <H> <root>: OK/FAIL per path-scoped rule; globs are passed as an array, never shell-expanded
+  local h="$1" root="$2" f n GLA
+  for f in $(find "$h/rules" -name '*.md' 2>/dev/null | sort); do
+    fm_has "$f" paths || continue
+    mapfile -t GLA < <(paths_of "$f")
+    [ "${#GLA[@]}" -gt 0 ] || { echo "  FAIL  ${f#$h/}: paths: has no globs"; continue; }
+    n=$(glob_matches "$root" "${GLA[@]}")
+    [ "$n" -gt 0 ] && echo "  PASS  ${f#$h/}: paths: match $n file(s)" || echo "  FAIL  ${f#$h/}: paths: match no file"
+  done
+}
+for f in rules/autonomy.md rules/git.md rules/multi-session.md; do [ -f "$H/$f" ] || fail "safety rule $f missing"; done
+CL=$(class_lint "$H"); [ -z "$CL" ] && ok "every rule has exactly one valid class; safety rules are load: always only" || { FAILS=$((FAILS + $(printf '%s\n' "$CL" | grep -c FAIL))); printf '%s\n' "$CL"; }
+ST=$(stale_lint "$H"); [ -z "$ST" ] && ok "no reference to any guide by a non-guides/ path (links or prose)" || { FAILS=$((FAILS + $(printf '%s\n' "$ST" | grep -c FAIL))); printf '%s\n' "$ST"; }
+for g in $(find "$H/guides" -name '*.md' 2>/dev/null | sort); do
+  [ -n "$(guide_consumers "$g")" ] && ok "guide ${g#$H/} has a consumer" || fail "guide ${g#$H/} has no consumer (nothing would ever load it)"
+done
+for g in $(find "$H/guides/project" -name '*.md' 2>/dev/null | sort); do
+  grep -qF "$(basename "$g")" "$H/rules/project/guides-index.md" 2>/dev/null && ok "project guide $(basename "$g") is in guides-index.md" || fail "project guide $(basename "$g") missing from rules/project/guides-index.md"
+done
+for a in "$H"/agents/*.md; do
+  grep -qF 'rules/project/guides-index.md' "$a" && ok "$(basename "$a") is told to read the project guide index" || fail "$(basename "$a") never points at rules/project/guides-index.md"
+done
+grep -qF 'rules/**/*.md' "$H/agents/reviewer.md" && ok "reviewer reads rules/** recursively (path-scoped and project rules too)" || fail "reviewer globs rules/ non-recursively (misses rules/project/)"
+grep -qE 'Read.*guides/code-review\.md' "$H/agents/reviewer.md" && ok "reviewer Reads guides/code-review.md" || fail "reviewer only mentions guides/code-review.md, never Reads it"
+# fixtures: the real lint functions, run against a fake tree, from a cwd where shell globbing would bite
+FX=$(mktemp -d); mkdir -p "$FX/.claude/rules" "$FX/src/sub" "$FX/node_modules"; echo x > "$FX/src/sub/x.ts"; echo x > "$FX/node_modules/y.js"
+printf -- '---\nload: always\npaths:\n  - "src/**"\n---\n' > "$FX/.claude/rules/both.md"
+printf -- '---\nload: never\n---\n' > "$FX/.claude/rules/never.md"
+printf -- '---\npaths:\n  - "src/**"\n---\n' > "$FX/.claude/rules/ok3.md"
+printf -- '---\npaths:\n  - "node_modules/**"\n---\n' > "$FX/.claude/rules/nm.md"
+printf -- '---\nload: always\npaths:\n  - "src/**"\n---\n' > "$FX/.claude/rules/git.md"
+FXC=$(class_lint "$FX/.claude")
+[ "$(printf '%s\n' "$FXC" | grep -c FAIL)" = 4 ] && ok "class_lint fixture: both-keys, load: never, and safety-with-paths caught (4 FAILs)" || { fail "class_lint fixture: expected 4 FAILs"; printf '%s\n' "$FXC"; }
+FXP=$( cd "$FX" && paths_lint "$FX/.claude" "$FX" )
+printf '%s\n' "$FXP" | grep -q 'ok3.md: paths: match 1 file' && ok "paths_lint from a cwd with src/ subdirs: globs not shell-expanded" || { fail "paths_lint expanded globs in the shell"; printf '%s\n' "$FXP"; }
+printf '%s\n' "$FXP" | grep -q 'nm.md: paths: match no file' && ok "paths_lint: a node_modules-only glob fails" || fail "paths_lint counted node_modules"
+mkdir -p "$FX/.claude/guides/project" "$FX/.claude/templates"; echo x > "$FX/.claude/guides/project/ext-sys.md"
+echo 'see .claude/rules/ext-sys.md' > "$FX/.claude/templates/t.md"; echo '### From `rules/ext-sys.md` (provenance)' > "$FX/.claude/rules/prov.md"
+FXS=$(stale_lint "$FX/.claude")
+{ printf '%s\n' "$FXS" | grep -q 'templates/t.md' && ! printf '%s\n' "$FXS" | grep -q 'prov.md'; } && ok "stale_lint fixture: project guide name caught in a template; provenance header exempt" || { fail "stale_lint fixture"; printf '%s\n' "$FXS"; }
+rm -rf "$FX"
+GT=$(mktemp -d); mkdir -p "$GT/src"; echo x > "$GT/src/a.ts"
+[ "$(glob_matches "$GT" '**/*.{ts,py}')" = 1 ] && ok "paths: match lint: brace glob positive control" || fail "paths: match lint brace glob broken"
+rm -rf "$GT"
+if [ "$H" != "$ROOT/core" ]; then   # installed projects only: globs must match real files
+  PL=$(paths_lint "$H" "$ROOT"); printf '%s\n' "$PL"; FAILS=$((FAILS + $(printf '%s\n' "$PL" | grep -c FAIL)))
 fi
 
 echo "== 6. Spec/plan pair naming =="

@@ -1,3 +1,6 @@
+---
+load: always
+---
 # Git: commits, branches, pushing
 
 The project's own branch flow, naming pattern and commit style are in

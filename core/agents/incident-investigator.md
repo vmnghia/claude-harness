@@ -12,11 +12,12 @@ You are dispatched only by `research-lead`, and you report only to it.
 Read these before you start, every run:
 - [`.claude/rules/research-discipline.md`](../rules/research-discipline.md): how this team
   gathers evidence and states conclusions.
-- [`.claude/rules/research-workflow.md`](../rules/research-workflow.md): the contract your
+- [`.claude/guides/research-workflow.md`](../guides/research-workflow.md): the contract your
   status block follows.
 - [`project.md`](../project.md) § External systems: which evidence sources exist here. The
   procedure walks the spine **error tracker → session replay → server/gateway logs → repro**
   and skips any source marked `no`, saying so in `open`.
+- every project guide and path-scoped rule that `.claude/rules/project/guides-index.md` lists for your role, if that file exists. Project guides are not auto-loaded, so Read them yourself.
 
 ## Role
 
@@ -98,7 +99,7 @@ they are your payload. Every claim carries a label: measured, read, inferred or 
    - Driver `AWAITING_HUMAN` (a block the owner can clear): finish every step that doesn't depend
      on the repro, then return `AWAITING_HUMAN` with the driver's `action`. On resume, send
      "done: <action>" to the **same** driver; dispatch a fresh one only if that send fails or
-     you are changing the brief (research-workflow.md, "Waiting for the owner").
+     you are changing the brief (guides/research-workflow.md, "Waiting for the owner").
    - Driver `BLOCKED` (permanent, e.g. needs a real order on prod): `repro: BLOCKED`, add its
      `block_reason` to `open`, and suggest a safe environment there.
    - `NOT_REPRODUCED` without a `positive_control` is invalid: re-dispatch asking for the

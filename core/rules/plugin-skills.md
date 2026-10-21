@@ -1,3 +1,6 @@
+---
+load: always
+---
 # Plugin skills — when to use what
 
 Stance on Claude Code plugin skills that are installed but not obvious whether to invoke. Use these defaults; situational skills not listed here are fine to invoke when they clearly fit.
@@ -17,7 +20,7 @@ The `superpowers:*` plugin ships ~15 skills. The harness will nudge me to invoke
 
 ### Already covered elsewhere — don't double up
 - **`superpowers:verification-before-completion`** → use [verification.md](./verification.md) (chrome-devtools MCP for UI, browser repro for bug fixes). That file is canonical.
-- **`superpowers:receiving-code-review`** → required by [code-review.md](./code-review.md) for every CodeRabbit comment.
+- **`superpowers:receiving-code-review`** → required by [guides/code-review.md](../guides/code-review.md) for every CodeRabbit comment.
 
 ### Situational (no rule needed)
 Invoke when the task obviously fits; no project-level mandate:

@@ -1,3 +1,6 @@
+---
+load: always
+---
 # Research discipline
 
 How to gather evidence and state conclusions in an investigation, a research brief or a review.
@@ -102,6 +105,6 @@ For `research-lead` and `incident-investigator` when dispatching a teammate:
 
 - State the **goal** alongside the mechanism, so a teammate who finds the mechanism false still
   knows what to do.
-- Include a **context capsule** (`ai-workflow.md`): subagents start cold, so pass the facts
+- Include a **context capsule** (`guides/ai-workflow.md`): subagents start cold, so pass the facts
   they need, and never invent ones you don't have.
 - Grep every path and field you name in the brief (§2).

@@ -20,7 +20,7 @@ npx -p skills@latest -- skills add <owner/repo> \
 - `--copy` writes a real file under `.claude/skills/` instead of a symlink into a `.agents/`
   store, so the skill survives if that store is cleaned.
 - If `.claude/` is untracked in this project, an installed skill is per-developer: it never
-  reaches teammates through git ([working-style.md](./working-style.md#file-layout)).
+  reaches teammates through git ([working-style.md](../rules/working-style.md#file-layout)).
 - An install can drop a `skills-lock.json` at the repo root, which may be tracked. Committing it
   is a team-visible change: coordinate first, don't let it ride along in a feature PR.
 

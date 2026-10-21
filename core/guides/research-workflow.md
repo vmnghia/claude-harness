@@ -6,7 +6,7 @@ returns, and how a run moves through human-run captures. Counterpart of
 status-block frame and context capsule. Design and decisions: `docs/2026-10-14-research-workflow-design.md`
 in the harness repo.
 
-Every agent here also follows [research-discipline.md](./research-discipline.md) and writes
+Every agent here also follows [research-discipline.md](../rules/research-discipline.md) and writes
 into an investigation folder shaped by
 [templates/findings-template.md](../templates/findings-template.md).
 
@@ -16,7 +16,7 @@ Agents: `research-lead`, `incident-investigator`, `repro-driver`, `searcher`, `w
 **Standalone use (2026-10-16).** `searcher` and `web-reader` may also be dispatched
 directly by the main session for a single lookup, outside any run: no investigation folder
 (`findings: null`), no cap, and the main session applies this file's routing table itself.
-The when-to and the citation rules are in [delegation.md](./delegation.md).
+The when-to and the citation rules are in [delegation.md](../rules/delegation.md).
 
 ## Flow and roles
 

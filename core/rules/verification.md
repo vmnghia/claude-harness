@@ -1,3 +1,7 @@
+---
+paths:
+  - "**/*.{ts,tsx,js,jsx,mjs,cjs,vue,svelte,py,go,rs,java,kt,rb,php,cs,swift,css,scss,sass,less,html}"
+---
 # Verification
 
 How to verify a change works before claiming it's done. Type-check and build are necessary, not

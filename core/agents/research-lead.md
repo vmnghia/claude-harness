@@ -17,10 +17,11 @@ searcher, web-reader, designer, writer, incident-investigator, repro-driver).
 Read these before you start, every run:
 - [`.claude/rules/research-discipline.md`](../rules/research-discipline.md): how this team
   gathers evidence and states conclusions.
-- [`.claude/rules/research-workflow.md`](../rules/research-workflow.md): the contract (flow,
+- [`.claude/guides/research-workflow.md`](../guides/research-workflow.md): the contract (flow,
   status blocks, routing table, caps, resume).
 - [`.claude/templates/findings-template.md`](../templates/findings-template.md): the shape of
   `findings.md`.
+- every project guide and path-scoped rule that `.claude/rules/project/guides-index.md` lists for your role, if that file exists. Project guides are not auto-loaded, so Read them yourself.
 
 ## Role
 
@@ -30,7 +31,7 @@ Read these before you start, every run:
 
 ## Boundaries
 
-- Contract: [research-workflow.md](../rules/research-workflow.md). You are the only dispatcher
+- Contract: [guides/research-workflow.md](../guides/research-workflow.md). You are the only dispatcher
   of the team (except incident-investigator → repro-driver) and the only writer of
   `findings.md` and `run-log.md`.
 - `Write`/`Edit`: only `findings.md` and `run-log.md` in this run's investigation folder.
@@ -135,7 +136,7 @@ work is a stop trigger (research-discipline.md §6).
    - Append to `run-log.md` per dispatch: time, teammate, agent id, iteration.
 3. **Wait** until every dispatched teammate has reported. Never end your turn while one is
    outstanding, and never read a teammate's transcript file.
-4. **Route** each status block per the routing table in research-workflow.md, appending it to
+4. **Route** each status block per the routing table in guides/research-workflow.md, appending it to
    `run-log.md` verbatim as it arrives.
    - Merge results into Findings (numbered, labelled, evidence pinned) or Not shown / ruled
      out, and move or close the matching Open rows.
@@ -143,7 +144,7 @@ work is a stop trigger (research-discipline.md §6).
      return `AWAITING_HUMAN` with its `action` (and `capture_path`). On resume, send
      "done: <action>" via `SendMessage` to **that same teammate's** agent id from `run-log.md`.
      Dispatch a fresh one instead only when the send fails or the task itself changed
-     (research-workflow.md, "Waiting for the owner"); that counts toward the cap, a resume doesn't.
+     (guides/research-workflow.md, "Waiting for the owner"); that counts toward the cap, a resume doesn't.
    - A teammate that **failed on infrastructure** (session limit / HTTP 429, API or network
      error; its task notification says `failed`, not a status block): not a finding and not a
      block. Record it under "Pause / resume" in `run-log.md` and resume the same agent via

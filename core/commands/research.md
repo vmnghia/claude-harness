@@ -3,7 +3,7 @@ description: Research team — frame a question with the owner inline, then the 
 argument-hint: <question | FRONT-XXXX> [--max-iter=N] | --resume <investigation-folder>
 ---
 
-Contract: [`.claude/rules/research-workflow.md`](../rules/research-workflow.md). This command
+Contract: [`.claude/guides/research-workflow.md`](../guides/research-workflow.md). This command
 only selects where each phase runs; the procedure lives in
 [`.claude/agents/research-lead.md`](../agents/research-lead.md).
 
@@ -25,7 +25,7 @@ Raw arguments: `$ARGUMENTS`.
 2. **Frame.** Execute research-lead.md § "Framing" **inline in this session**. It creates
    `findings.md` from the template (frontmatter, question, dispatch plan).
 3. **Dispatch.** Agent tool, `subagent_type: "research-lead"`, with: the folder path, the
-   framing, `--max-iter`, and a context capsule (`ai-workflow.md` template). Then write
+   framing, `--max-iter`, and a context capsule (`guides/ai-workflow.md` template). Then write
    `lead.txt` in the folder: `lead_agent_id: <id from the Agent result>`. This is the main
    session's only file in the folder; `run-log.md` belongs to the lead.
 4. **Wait.** Do not end this turn while the lead is outstanding. Never read its transcript file.
@@ -45,7 +45,7 @@ Raw arguments: `$ARGUMENTS`.
 2. SendMessage to that id. (SendMessage is a deferred tool: load its schema with ToolSearch
    `select:SendMessage` first.) Pick the message by how the lead stopped:
    - Last status block `AWAITING_HUMAN`: "done: <the action from that block>; continue."
-   - Failed on infrastructure, with no status block (research-workflow.md, "Infrastructure
+   - Failed on infrastructure, with no status block (guides/research-workflow.md, "Infrastructure
      failures"): "You and your teammates were cut off by <error> at <time>, not by anything in
      the brief. Resume each failed teammate via SendMessage (not a dispatch), have the
      investigator resume its own driver, re-check preconditions, and continue."

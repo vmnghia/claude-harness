@@ -11,4 +11,4 @@ input. End with the planner status block.
 
 To plan in the background instead (autonomous mode), dispatch the `planner`
 subagent via the Agent tool with a context capsule — see
-`.claude/rules/ai-workflow.md`.
+`.claude/guides/ai-workflow.md`.

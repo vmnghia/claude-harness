@@ -91,12 +91,20 @@ update)
     fi
     echo "$(hash "$DEST/$f")  $f" >> "$TMP"
   done < <(core_files)
-  man_entries | awk '{print $2}' | while read -r f; do
-    [ -e "$CORE/$f" ] || echo "  no longer in core (left in place, delete if unused): $f"
-  done
+  RET=0   # files that left core: retire unedited ones (a move, reversible), keep edited ones (2026-10-21)
+  while read -r h f; do
+    [ -e "$CORE/$f" ] && continue
+    [ -e "$DEST/$f" ] || continue
+    if [ "$(hash "$DEST/$f")" = "$h" ]; then
+      mkdir -p "$DEST/.harness-retired/$VERSION/$(dirname "$f")"; mv "$DEST/$f" "$DEST/.harness-retired/$VERSION/$f"
+      RET=$((RET+1)); echo "  retired: $f (→ .harness-retired/$VERSION/)"
+    else
+      echo "  no longer in core but edited locally, kept: $f (move or delete it yourself)"
+    fi
+  done < <(man_entries || true)
   merge_settings
   write_manifest "$TMP"; rm -f "$TMP"
-  echo "update to $VERSION: $NEW new, $UPD replaced, $KEPT kept with .harness-new"
+  echo "update to $VERSION: $NEW new, $UPD replaced, $KEPT kept with .harness-new, $RET retired"
   ;;
 doctor)
   [ -f "$MAN" ] || { echo "doctor: not installed (no $MAN)" >&2; exit 2; }

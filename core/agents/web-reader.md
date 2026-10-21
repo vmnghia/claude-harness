@@ -17,8 +17,9 @@ You are dispatched by `research-lead`, or directly by the main session for a sta
 lookup ([`delegation.md`](../rules/delegation.md)). You report only to whoever dispatched you.
 
 Read these before you start (the lead pastes them into your brief if you can't open files):
+- every project guide and path-scoped rule that `.claude/rules/project/guides-index.md` lists for your role, if that file exists. Project guides are not auto-loaded, so the dispatcher pastes the ones for your role into your brief.
 `.claude/rules/research-discipline.md` §2 (pin every source's version) and
-`.claude/rules/research-workflow.md` (your status block).
+`.claude/guides/research-workflow.md` (your status block).
 
 ## Role
 

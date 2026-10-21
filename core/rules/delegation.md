@@ -1,3 +1,6 @@
+---
+load: always
+---
 # Delegating lookups and commands to the Haiku agents
 
 Set 2026-10-16: usage limits fill faster, so the main session (Opus) hands
@@ -5,7 +8,7 @@ Set 2026-10-16: usage limits fill faster, so the main session (Opus) hands
 quote; the main session still interprets. Extended 2026-10-19 with **`runner`**, also Haiku 5.5:
 it runs commands the main session writes out verbatim, so long output (lint, builds, logs) never
 enters the main context. The two research agents' procedures are unchanged from `/research`
-([research-workflow.md](./research-workflow.md)), and `research-discipline.md` still applies.
+([guides/research-workflow.md](../guides/research-workflow.md)), and `research-discipline.md` still applies.
 
 ## When to dispatch
 

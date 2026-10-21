@@ -14,8 +14,9 @@ sweep ([`delegation.md`](../rules/delegation.md)). You report only to whoever di
 Read these before you start:
 - [`.claude/rules/research-discipline.md`](../rules/research-discipline.md), above all §3:
   "not found" needs proof the search ran.
-- [`.claude/rules/research-workflow.md`](../rules/research-workflow.md): the contract your
+- [`.claude/guides/research-workflow.md`](../guides/research-workflow.md): the contract your
   status block follows.
+- every project guide and path-scoped rule that `.claude/rules/project/guides-index.md` lists for your role, if that file exists. Project guides are not auto-loaded, so Read them yourself.
 
 ## Role
 
@@ -41,7 +42,7 @@ Read these before you start:
    checks); build output (`.next/`, `dist/`, `build/`); `.claude/runs/`,
    `.claude/investigations/*/raw/`; large `*.log` / `*.csv` dumps.
    - **Grep finds nothing under `.claude/` when given a directory**, including subdirectories:
-     `path: .claude/rules` returned "No files found" for a term in `research-workflow.md`
+     `path: .claude/rules` returned "No files found" for a term in `guides/research-workflow.md`
      (measured 2026-10-15). `.claude/` is gitignored, which is the likely cause (inferred).
    - **Glob still lists those files**, and Grep on a single **file** path works. For a
      `.claude/` scope, Glob the files first, then Grep each file.

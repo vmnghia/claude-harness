@@ -1,3 +1,6 @@
+---
+load: always
+---
 # Working style
 
 ## File layout

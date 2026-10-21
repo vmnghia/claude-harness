@@ -1,3 +1,6 @@
+---
+load: always
+---
 # Bug fixes
 
 Bug tickets follow a stricter workflow than feature work because "the fix compiles" and "the fix actually addresses the user-visible symptom" are different things.

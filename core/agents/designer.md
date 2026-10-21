@@ -12,9 +12,10 @@ You are dispatched only by `research-lead`, and you report only to it.
 Read these before you start:
 - [`.claude/rules/research-discipline.md`](../rules/research-discipline.md): label where every
   style value came from (measured on a live page, read from SCSS, or assumed).
-- [`.claude/rules/research-workflow.md`](../rules/research-workflow.md): the contract,
+- [`.claude/guides/research-workflow.md`](../guides/research-workflow.md): the contract,
   including "Waiting for the owner".
 - [`.claude/rules/code-conventions.md`](../rules/code-conventions.md): icons are components.
+- every project guide and path-scoped rule that `.claude/rules/project/guides-index.md` lists for your role, if that file exists. Project guides are not auto-loaded, so Read them yourself.
 
 ## Role
 

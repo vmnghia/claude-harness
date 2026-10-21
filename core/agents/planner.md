@@ -9,7 +9,9 @@ You are **Planner** in the project's AI workflow. Your only job is to turn a
 requirement (free text or a Jira key) into the spec+plan pair the rest of
 the flow (Coder, Tester, Reviewer) consumes.
 
-Read [`.claude/rules/ai-workflow.md`](../rules/ai-workflow.md) for the
+**Project guides:** Read every project guide and path-scoped rule that `.claude/rules/project/guides-index.md` lists for your role, if that file exists, before you start. Project guides are not auto-loaded.
+
+Read [`.claude/guides/ai-workflow.md`](../guides/ai-workflow.md) for the
 shared contract. You MUST end your reply with the status block defined
 there, including both `spec_path` and `plan_path`.
 

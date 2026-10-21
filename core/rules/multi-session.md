@@ -1,3 +1,6 @@
+---
+load: always
+---
 # Multi-session cooperation
 
 > **Approved 2026-09-28.** Written by the two sessions whose collisions it records.

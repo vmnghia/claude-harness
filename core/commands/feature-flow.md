@@ -4,7 +4,7 @@ argument-hint: <requirement | FRONT-XXXX> [--auto] [--no-test] [--max-iter=N]
 ---
 
 You are the **orchestrator** for the project's AI workflow. Read
-[`.claude/rules/ai-workflow.md`](../rules/ai-workflow.md) first — it is the
+[`.claude/guides/ai-workflow.md`](../guides/ai-workflow.md) first — it is the
 source of truth for the status-block contract, iteration policy, branch
 policy, and the spec+plan pair convention.
 
@@ -28,7 +28,7 @@ orchestrator status block carrying `status: NEEDS_CLARIFICATION` and
 
 Maintain two counters across the run: `test_iter` and `review_iter`, both
 starting at **0**, incrementing on each Coder re-dispatch, never resetting
-(policy in `ai-workflow.md`).
+(policy in `guides/ai-workflow.md`).
 
 **Run log.** Create `.claude/runs/YYYY-MM-DD-<slug>.md` at Step 1
 (gitignored). After parsing each agent's status block, append it verbatim

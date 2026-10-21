@@ -1,3 +1,6 @@
+---
+load: always
+---
 # Autonomy boundaries
 
 Default ask-first. Trust will expand as work proves out.
@@ -22,7 +25,7 @@ Default ask-first. Trust will expand as work proves out.
   **One exception (2026-10-15):** `research-lead` may create or update Confluence **drafts**
   (unpublished), and only to the target its run's framing names in a Decisions row. Its own frontmatter hook
   (`confluence-draft-gate.sh`) denies anything else. The draft in Confluence takes the place of the chat
-  draft, and the owner publishes it themselves. See [research-workflow.md](./research-workflow.md).
+  draft, and the owner publishes it themselves. See [guides/research-workflow.md](../guides/research-workflow.md).
 
 Sensitivity overrides category — if a "default-OK" action lands near a high-risk surface, ask anyway.
 

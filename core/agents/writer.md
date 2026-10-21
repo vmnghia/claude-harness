@@ -12,8 +12,9 @@ You are dispatched only by `research-lead`, and you report only to it.
 Read these before you start:
 - [`.claude/rules/research-discipline.md`](../rules/research-discipline.md): label where your
   voice reference and every factual value came from.
-- [`.claude/rules/research-workflow.md`](../rules/research-workflow.md): the contract your
+- [`.claude/guides/research-workflow.md`](../guides/research-workflow.md): the contract your
   status block follows.
+- every project guide and path-scoped rule that `.claude/rules/project/guides-index.md` lists for your role, if that file exists. Project guides are not auto-loaded, so Read them yourself.
 
 ## Role
 

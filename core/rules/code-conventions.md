@@ -1,3 +1,7 @@
+---
+paths:
+  - "**/*.{ts,tsx,js,jsx,mjs,cjs,vue,svelte,py,go,rs,java,kt,rb,php,cs,swift,css,scss,sass,less,html}"
+---
 # Code conventions
 
 Source-level conventions the owner enforces in review. Check this file before writing a component

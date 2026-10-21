@@ -12,38 +12,53 @@ skip the steps that need them.
 ## Contents
 
 - [Rules](#rules)
+- [Guides](#guides)
 - [Agents and commands](#agents-and-commands)
 - [Hooks](#hooks)
 - [Maintaining the harness](#maintaining-the-harness)
 
 ## Rules
 
-Detailed rules live under [rules/](./rules/).
-- **Claude Code loads every `rules/**/*.md` at session start, recursively, into the main session
-  and every subagent** (measured 2026-10-19). The one exception is a rule with `paths:`
-  frontmatter, which loads only once a file matching its globs is touched.
-- So each rule's size is paid per session and per dispatch. A rule needed only for one kind of
-  task belongs behind `paths:`, or outside `rules/` with an index line here.
-- **Project-owned rules go in `rules/project/`.** The installer never writes there, and Claude Code
-  discovers the folder on its own, so no index is needed.
+Claude Code loads every `rules/**/*.md` at session start, recursively, into the main session **and
+every subagent** (measured 2026-10-19). That's paid per session and per dispatch, so every rule
+declares one of three **loading classes**. `harness-check` §5e fails an unmarked rule.
 
-- [working-style.md](./rules/working-style.md) — diffs, reviews, decision capture, where harness files live
-- [code-conventions.md](./rules/code-conventions.md) — read before writing a component or helper: icons as components, JSDoc on exported helpers, generic helpers in generic files
-- [autonomy.md](./rules/autonomy.md) — what's OK without asking, what to ask the owner first (pushes, branches, any write to a shared system)
-- [git.md](./rules/git.md) — commit messages, branch names, pushing, diverged branches; the promotion flow is in `project.md`
-- [delegation.md](./rules/delegation.md) — **the main session hands lookups and commands to Haiku**: broad repo sweeps → `searcher`, web/docs lookups → `web-reader`, long or repetitive commands (lint, builds, log sweeps, multi-step git) → `runner`, which runs only verbatim commands and lints report-only; cite only hook-verified `sources[]`
-- [research-discipline.md](./rules/research-discipline.md) — provenance label on every claim, pin every source's version, positive control before any null, stop triggers, assumptions ledger
-- [research-workflow.md](./rules/research-workflow.md) — the research team's contract (`/research`)
-- [ai-workflow.md](./rules/ai-workflow.md) — the feature workflow's contract: Planner → Coder → Tester → Reviewer, `/feature-flow`
-- [bug-fixes.md](./rules/bug-fixes.md) — reproduce locally before fixing
-- [verification.md](./rules/verification.md) — real-browser verification, fixtures that can break, device emulation, measurement pitfalls; type-check ≠ verified
-- [multi-session.md](./rules/multi-session.md) — two or more Claude sessions on one machine: shared resources, the measurement lock, owning your processes
-- [code-review.md](./rules/code-review.md) — working with an AI second reviewer (CodeRabbit) and `superpowers:receiving-code-review`
-- [plugin-skills.md](./rules/plugin-skills.md) — when to use which plugin skill
-- [agent-skills.md](./rules/agent-skills.md) — finding and recommending skills from the agent-skills ecosystem
+1. **Always loaded**, frontmatter `load: always`: safety and conduct rules a session might need
+   without knowing it. When in doubt, a rule goes here.
+2. **Loaded by the task**: lives in [guides/](./guides), which nothing auto-loads. Its consumers
+   (commands, agents, skills) Read it explicitly. See [Guides](#guides).
+3. **Loaded when code is touched**, frontmatter `paths:` (a list of globs): the platform loads the
+   rule once a matching file is read or edited, in that session or subagent (measured 2026-10-21).
+
+**Project-owned rules go in `rules/project/`, and project guides in `guides/project/`.** The
+installer writes neither. Project guides are listed in `rules/project/guides-index.md`, which is
+class 1, so every agent sees which ones its role reads.
+
+- [working-style.md](./rules/working-style.md) — (1) diffs, reviews, decision capture, where harness files live
+- [autonomy.md](./rules/autonomy.md) — (1) what's OK without asking, what to ask the owner first (pushes, branches, any write to a shared system)
+- [git.md](./rules/git.md) — (1) commit messages, branch names, pushing, diverged branches; the promotion flow is in `project.md`
+- [delegation.md](./rules/delegation.md) — (1) **the main session hands lookups and commands to Haiku**: broad repo sweeps → `searcher`, web/docs lookups → `web-reader`, long or repetitive commands (lint, builds, log sweeps, multi-step git) → `runner`, which runs only verbatim commands and lints report-only; cite only hook-verified `sources[]`
+- [research-discipline.md](./rules/research-discipline.md) — (1) provenance label on every claim, pin every source's version, positive control before any null, stop triggers, assumptions ledger
+- [multi-session.md](./rules/multi-session.md) — (1) two or more Claude sessions on one machine: shared resources, the measurement lock, owning your processes
+- [bug-fixes.md](./rules/bug-fixes.md) — (1) reproduce locally before fixing
+- [plugin-skills.md](./rules/plugin-skills.md) — (1) when to use which plugin skill
+- [verification.md](./rules/verification.md) — (3, code files) **type-check ≠ verified: verify in a real browser** before claiming done; fixtures that can break, device emulation, measurement pitfalls. Read it before verifying anything, even when no source file is open.
+- [code-conventions.md](./rules/code-conventions.md) — (3, code files) icons as components, JSDoc on exported helpers, generic helpers in generic files
 
 When adding a convention, prefer extending an existing rule file. Add a new file only when the
-topic doesn't fit, then index it here.
+topic doesn't fit, then index it here **with its class**.
+
+## Guides
+
+Loaded by the task that needs them, never auto-loaded. Each one names its consumers, which Read it before starting. The main session
+reads it when the trigger applies.
+
+| Guide | Consumers | Main session reads it when… |
+|---|---|---|
+| [research-workflow.md](./guides/research-workflow.md) | `/research`, research-lead, incident-investigator, repro-driver, searcher, web-reader, designer, writer | running or resuming `/research`, or dispatching a research agent directly |
+| [ai-workflow.md](./guides/ai-workflow.md) | `/feature-flow`, `/planner`, planner, coder, tester, reviewer | running the feature workflow or dispatching one of its agents |
+| [code-review.md](./guides/code-review.md) | reviewer | triaging review comments (CodeRabbit or human) |
+| [agent-skills.md](./guides/agent-skills.md) | — | answering "can you do X / is there a skill for X", or recommending skills |
 
 ## Agents and commands
 

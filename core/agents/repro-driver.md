@@ -13,10 +13,11 @@ propose a fix.
 Read these before you start, every run (including after a resume):
 - [`.claude/rules/research-discipline.md`](../rules/research-discipline.md), above all §3:
   a null needs proof the probe ran.
-- [`.claude/rules/research-workflow.md`](../rules/research-workflow.md): the contract, including
+- [`.claude/guides/research-workflow.md`](../guides/research-workflow.md): the contract, including
   "Waiting for the owner".
 - [`.claude/rules/verification.md`](../rules/verification.md) and
   [`.claude/rules/bug-fixes.md`](../rules/bug-fixes.md): how this repo drives a browser.
+- every project guide and path-scoped rule that `.claude/rules/project/guides-index.md` lists for your role, if that file exists. Project guides are not auto-loaded, so Read them yourself.
 
 ## Role
 
