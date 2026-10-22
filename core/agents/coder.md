@@ -24,15 +24,23 @@ The caller (orchestrator or human) provides one of:
   fixing those failures only.
 - A spec path **plus** a `findings[]` payload from Reviewer — scope edits to
   addressing those findings only.
+- A `findings[]` payload labelled **`FIX FROM ADVERSARIAL REVIEW`** with a `case_file` path and
+  **no spec** (findings-only mode, from `/adversarial-review`;
+  [`guides/adversarial-review.md`](../guides/adversarial-review.md) § Message shapes). Scope
+  edits to those findings only.
 
 Alongside the spec, read its sibling `-plan.md` (same filename stem) when it
 exists. If no spec path is provided, locate the newest `*-spec.md` under
 `.claude/specs/` by filename date and its sibling plan. If none exists,
 emit `BLOCKED` with `blockers: ["No spec found under .claude/specs/. Run /planner first."]`.
+In findings-only mode, **never fall back to the newest spec**: there is none for this work, and
+the newest one under `.claude/specs/` is unrelated. Read the case file's state block for
+context only, and never edit the case file.
 
 ## Procedure
 
-1. **Read the spec end-to-end** before touching any file.
+1. **Read the spec end-to-end** before touching any file (or, in findings-only mode, the
+   findings and the case file's state block).
 2. **Read the relevant rule files** the spec references. Every run, read at minimum
    [`working-style.md`](../rules/working-style.md),
    [`code-conventions.md`](../rules/code-conventions.md) (icons, JSDoc on exported helpers,
@@ -47,12 +55,15 @@ emit `BLOCKED` with `blockers: ["No spec found under .claude/specs/. Run /planne
      status block `notes`.
    - When invoked with a `failures[]` payload, scope edits strictly to
      code paths that produce those failures.
-   - When invoked with a `findings[]` payload, address each finding
+   - When invoked with a `findings[]` payload (from Reviewer, or labelled
+     `FIX FROM ADVERSARIAL REVIEW`), address each finding
      individually. Route the response through the
      `superpowers:receiving-code-review` skill (via the `Skill` tool) before
      applying — that skill prevents performative agreement and reflexive
      defense; it asks you to verify, prove non-applicable, or surface real
-     ambiguity per finding.
+     ambiguity per finding. A finding you prove non-applicable is reported in
+     `not_applicable[]` with its id and the evidence, never silently skipped: in
+     findings-only mode the orchestrator sends your reason up the judge ladder.
    - Use the project's import aliases (`project.md` § Code layout); no relative imports out of a
      source root when the project bans them.
 5. **Verify locally.** Commands are in [`project.md`](../project.md) § Commands.
@@ -106,7 +117,7 @@ End your reply with exactly one status block:
 agent: coder
 status: IMPLEMENTED | BLOCKED
 iteration: <test_iter or review_iter from caller, default 1>
-spec: <path-to-spec>
+spec: <path-to-spec>          # n/a in findings-only mode
 payload:
   changed_files:
     - path: src/components/example.tsx
@@ -115,5 +126,6 @@ payload:
   build_result: pass | fail
   test_result: pass | fail | n/a    # n/a when the project has no test runner
   blockers: []                # populated when status is BLOCKED
+  not_applicable: []          # findings you proved non-applicable: {id, reason}; empty when none
 ---
 ```
