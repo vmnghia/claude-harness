@@ -35,7 +35,10 @@ Raw arguments: `$ARGUMENTS`. Parse out:
   here. Never create the branch yourself.
 - **Diff:** read-only git in this session. An empty diff ends the run with the final block
   carrying `NO_DIFF`; nothing is written.
-- **Case file:** created and written by you, and only you, per the guide § Case file. Append each
+- **Case file:** created and written by you, and only you, per the guide § Case file. Before
+  creating it, run `git check-ignore -q .claude/runs`; when that fails, print one warning that
+  the case file would be committed by a `git add .` and suggest adding `.claude/runs/` to the
+  project's `.gitignore`. Append each
   phase's blocks verbatim as they arrive; rewrite the state block at every round boundary.
 - **Before each round**, print one line with the round number, the cap, and an estimated cost:
   the fixture run cost about $4 per round on a four-file diff with no callers; scale by the
@@ -69,7 +72,7 @@ Raw arguments: `$ARGUMENTS`. Parse out:
 `--resume [<case-file>]`:
 
 1. Read the state block of the given file, else the newest `.claude/runs/*-adversarial-*.md`.
-   If there is none, stop and say so.
+   If there is none, stop and say so. When `--no-fix` is off, run the branch gate again first.
 2. Recompute `tree` with the recorded base exactly as the guide § Case file defines it: over
    `git diff <base>` **and** every untracked, non-ignored file, since a fix to a new file never
    shows in `git diff`. If it differs from the

@@ -343,8 +343,12 @@ Found by the final whole-branch review and fixed after it: the judge ladder ends
 challenger's second `CHALLENGE` with no content check; a finding stalemates only when both sides
 are exhausted; duplicate findings merge via `same_as`; a reply carries one block per phase
 asked; Coder rejections the judge refutes are not a stall; prose is bounded and only blocks are
-relayed. Noted, not changed: Coder cannot run probe scripts, so each fix is behaviour-checked
-only by the next round's hunters.
+relayed. After the review, the deferred minors were also closed: Coder may run a scratchpad probe
+script to check its own fix; the Coder message carries `review_iter`; the hunt capsule allows a
+missing `project.md`; resume runs the branch gate when fixes are on and marks an abandoned
+attempt's findings `SUPERSEDED`; the command warns when `.claude/runs/` is not gitignored;
+`git check-ignore` and `git ls-files` are on the read-only list; hunters use only the guide's
+field names.
 
 ## Left to the builder
 

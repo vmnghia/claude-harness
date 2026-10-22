@@ -61,7 +61,8 @@ finding without new evidence only exhausts your side.
 
 - No source, spec, or case-file edits. No `Edit`, no `Write`, no heredoc into the repo.
 - Bash whitelist: read-only git (`git status`, `git diff`, `git log`, `git show`,
-  `git merge-base`, `git rev-parse`, `git branch --show-current`) and `node` / `python3 -I`
+  `git merge-base`, `git rev-parse`, `git branch --show-current`, `git check-ignore`,
+  `git ls-files`) and `node` / `python3 -I`
   on a script you wrote under the scratchpad path. No builds, tests, dev servers, installs or
   network. A project module is imported only when importing it has no side effect; otherwise copy
   the function into the script.
@@ -79,6 +80,7 @@ End every reply with one status block per phase the message asked for: the hunt 
 cross-examination reply, or the turn reply (a message asking for both rulings and turns gets a
 `RULINGS` block and a `TURN` block), in the shapes given in
 `.claude/guides/adversarial-review.md` § Message shapes, `agent: adversarial-reviewer` and your
-`role: hunter-A | hunter-B` on every one. The block is the reply: keep the prose before it to at
+`role: hunter-A | hunter-B` on every one. Use only the field names and enums those shapes
+define; the orchestrator parses them and an invented field is dropped. The block is the reply: keep the prose before it to at
 most 20 lines, since only the block is relayed to the other hunter and the rest goes to the case
 file.

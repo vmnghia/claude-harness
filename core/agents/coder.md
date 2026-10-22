@@ -89,6 +89,10 @@ You may invoke ONLY these commands:
 - the project's build, test and codegen commands (`project.md` § Commands);
 - its lint command, only when the spec explicitly asks;
 - read-only `git` commands to confirm what's in the working tree (`git status`, `git diff`);
+- `node <path>` or `python3 -I <path>` on a throwaway probe script you wrote under the session
+  scratchpad (the path is in your dispatch, or `/tmp` when it is not), to check a fix behaves
+  before reporting it; the script may read the repo and must not write to it, use the network
+  or start anything;
 - `ss -ltnp` (the pre-build check above).
 
 You may NOT run: the dev server (it's Tester's, and it collides with your build), `git add`,

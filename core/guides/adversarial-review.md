@@ -260,7 +260,9 @@ cross-examination continues its own sequence. The case file prefixes the round: 
 
 Role (`hunter-A` with angle `inside-out`, or `hunter-B` with angle `outside-in`); the resolved
 base ref and the changed-file list; the owner's context text verbatim (or "none"); `project.md`
-§ Stack and § Code layout verbatim; the session scratchpad path; the case-file path (for
+§ Stack and § Code layout verbatim (or the line `project.md missing` / `project.md still has
+TODOs`, in which case the hunter infers the stack from the files and says so); the session
+scratchpad path; the case-file path (for
 reference only; the hunter never writes it); the list of paths it never reads (§ Tool
 boundaries). Never the conversation, never the other hunter's output, never a spec.
 
@@ -360,7 +362,7 @@ message with Coder's reason in place of a hunter's turn.
 
 ### Coder, findings-only mode (orchestrator → coder)
 
-"FIX FROM ADVERSARIAL REVIEW. No spec. Case file: <path>. Findings: <AGREED blocker/major
+"FIX FROM ADVERSARIAL REVIEW. No spec. `iteration: <review_iter>`. Case file: <path>. Findings: <AGREED blocker/major
 findings in finding shape>." Coder's reply is its normal block with `spec: n/a` and
 `payload.not_applicable: [{id, reason}]` ([`coder.md`](../agents/coder.md)).
 
@@ -468,13 +470,16 @@ the next step, which is the owner committing. Never the orchestrator.
 `.claude/runs/*-adversarial-*.md`. Recompute `tree`. If it differs, say so and restart the
 current round on the new tree. Either way, start the current round again with **fresh** hunters
 from the recorded `review_iter` and the recorded states of earlier rounds. Mid-round debate state
-is never restored.
+is never restored. The abandoned attempt's findings stay in the state block with
+`state: SUPERSEDED` and their ids; the restart's ids get the next letter suffix (`r3b-`, `r3c-`),
+so nothing in the case file is overwritten. When fixes are on, the branch gate runs again before
+any fix dispatch.
 
 ## Case file
 
 `.claude/runs/YYYY-MM-DD-adversarial-<slug>.md`, date from the session, slug from the context
-text or the branch (kebab-case, at most five words), `-2`, `-3` on collision. Gitignored with the
-other run logs. The **orchestrator is the only writer**; agents receive its path for reference
+text or the branch (kebab-case, at most five words), `-2`, `-3` on collision. It should be gitignored like the other run logs; the installer does not add that line, so the
+command warns when `git check-ignore -q .claude/runs` fails. The **orchestrator is the only writer**; agents receive its path for reference
 and never touch it.
 
 The first fenced block is the state block, rewritten at every round boundary:
@@ -518,7 +523,8 @@ block is appended as the agent wrote it.
 | review-judge | ✅ | — | read-only git + scratchpad scripts | — |
 
 **Read-only git:** `git status`, `git diff`, `git log`, `git show`, `git merge-base`,
-`git rev-parse`, `git branch --show-current`. Nothing state-mutating.
+`git rev-parse`, `git branch --show-current`, `git check-ignore`, `git ls-files`. Nothing
+state-mutating.
 
 **Scratchpad scripts:** a throwaway script written with a Bash heredoc under the session
 scratchpad path from the capsule, run with `node <path>` or `python3 -I <path>`. Every agent

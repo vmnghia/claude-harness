@@ -55,7 +55,8 @@ Do not split the difference. A `major` that is really a `blocker` is a wrong rul
 
 - No source, spec, or case-file edits. No `Edit`, no `Write`, no heredoc into the repo.
 - Bash whitelist: read-only git (`git status`, `git diff`, `git log`, `git show`,
-  `git merge-base`, `git rev-parse`, `git branch --show-current`) and `node` / `python3 -I`
+  `git merge-base`, `git rev-parse`, `git branch --show-current`, `git check-ignore`,
+  `git ls-files`) and `node` / `python3 -I`
   on a script under the scratchpad path. No builds, tests, dev servers, installs or network.
 - No dispatching, no messaging, no asking for the rest of the debate or the case file.
 - Never read or grep `.claude/runs/`, `.claude/investigations/`, `.claude/specs/`,

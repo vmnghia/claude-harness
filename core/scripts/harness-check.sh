@@ -820,6 +820,17 @@ if [ "$H" = "$ROOT/core" ]; then   # harness repo only: the design doc is not in
   grep -qF 'after the resume drill' "$ROOT/docs/2026-10-22-adversarial-review-design.md" && ok "design § Verified says which fixes landed after the resume drill" || fail "design § Verified misstates when the live-run fixes landed"
 fi
 
+# deferred minors from the final review and the live runs, 2026-10-22
+grep -qF 'iteration: <review_iter>' "$AR" && ok "adversarial-review.md: the Coder message carries review_iter" || fail "adversarial-review.md: the Coder message lacks review_iter"
+grep -qF 'project.md missing' "$AR" && ok "adversarial-review.md: hunt capsule allows a missing project.md" || fail "adversarial-review.md: hunt capsule assumes project.md"
+grep -qF 'branch gate' "$CMD" && sed -n '/^## Resume/,/^## Final/p' "$CMD" | grep -qF 'branch gate' && ok "adversarial-review command: resume runs the branch gate when fixes are on" || fail "adversarial-review command: resume skips the branch gate"
+grep -qF 'check-ignore' "$CMD" && ok "adversarial-review command warns when .claude/runs/ is not ignored" || fail "adversarial-review command never checks that .claude/runs/ is ignored"
+grep -qF 'Gitignored with the other run logs' "$AR" && fail "adversarial-review.md still claims .claude/runs/ is gitignored" || ok "adversarial-review.md no longer claims .claude/runs/ is gitignored"
+grep -qF 'SUPERSEDED' "$AR" && ok "adversarial-review.md: an abandoned round attempt's findings are SUPERSEDED" || fail "adversarial-review.md: abandoned round attempt unspecified"
+for f in "$AR" "$HUNTER" "$JUDGE"; do grep -qF 'git check-ignore' "$f" && ok "$(basename "$f") whitelists git check-ignore" || fail "$(basename "$f") lacks git check-ignore in the read-only git list"; done
+grep -qF 'only the field names' "$HUNTER" && ok "adversarial-reviewer uses only the guide's field names" || fail "adversarial-reviewer may invent field names"
+grep -qF 'scratchpad' "$CODER" && ok "coder.md allows scratchpad probe scripts" || fail "coder.md cannot run a probe script to check its own fix"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
