@@ -479,7 +479,7 @@ any fix dispatch.
 
 `.claude/runs/YYYY-MM-DD-adversarial-<slug>.md`, date from the session, slug from the context
 text or the branch (kebab-case, at most five words), `-2`, `-3` on collision. It should be gitignored like the other run logs; the installer does not add that line, so the
-command warns when `git check-ignore -q .claude/runs` fails. The **orchestrator is the only writer**; agents receive its path for reference
+command warns when `git check-ignore -q .claude/runs/` (trailing slash: the directory may not exist yet) fails. The **orchestrator is the only writer**; agents receive its path for reference
 and never touch it.
 
 The first fenced block is the state block, rewritten at every round boundary:

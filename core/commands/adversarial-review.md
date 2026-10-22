@@ -36,7 +36,7 @@ Raw arguments: `$ARGUMENTS`. Parse out:
 - **Diff:** read-only git in this session. An empty diff ends the run with the final block
   carrying `NO_DIFF`; nothing is written.
 - **Case file:** created and written by you, and only you, per the guide § Case file. Before
-  creating it, run `git check-ignore -q .claude/runs`; when that fails, print one warning that
+  creating it, run `git check-ignore -q .claude/runs/` (trailing slash: the directory may not exist yet); when that fails, print one warning that
   the case file would be committed by a `git add .` and suggest adding `.claude/runs/` to the
   project's `.gitignore`. Append each
   phase's blocks verbatim as they arrive; rewrite the state block at every round boundary.

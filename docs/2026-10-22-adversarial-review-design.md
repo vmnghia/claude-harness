@@ -329,7 +329,9 @@ branch with `install.sh`; runs in fresh `claude -p --model claude-opus-5-5` sess
 
 | Second resume drill, on the final guide text after the review fix pass | **Pass.** With the recorded tree matching, `--resume --no-fix --auto` said the source tree had not changed, restarted the current round anyway with fresh hunters, merged 8 findings to 5 through `same_as`, kept `review_iter` 2 and the earlier states, excluded the never-read paths and earlier scratchpad folders, and ended `NEEDS_OWNER` on the one unanswered question. |
 
-Cost: smoke run $11.47 over about 23 minutes; resume drills $3.33 and $3.15.
+| Real diff: worker MR !50 (the S3 read-deadline branch, 6 files, against the merge-base with its release branch), in a throwaway worktree with the harness installed fresh, `--no-fix --auto` | **Pass.** One round, `REVIEWED`. One `AGREED` major the hunters chased through code the diff did not touch: a read that now times out in a non-strict folder load publishes an incomplete whole-collection blob and advances the baseline, where before the hang left consumers with stale but complete data (the design's "error path turns destructive" bucket). One minor (unclamped deadline env var), two nits, four executed probes, a staging test plan. Both hunters agreed at cross-examination; no judge. One hunter read the SDK source from the main checkout's `node_modules`, outside the worktree: not on the never-read list, left for the owner to decide. |
+
+Cost: smoke run $11.47 over about 23 minutes; resume drills $3.33 and $3.15; real run $5.78.
 
 Harness defects the live runs surfaced, all fixed on this branch. Found by the smoke run and
 fixed before the resume drill: the tree hash must cover untracked files; hunters and the judge
