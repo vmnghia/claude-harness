@@ -9,7 +9,9 @@ not allowed to do. Design history (2026-07-07 rearchitecture) predates the publi
 Four agents; Planner is **dual-entry**, the other three are subagents only.
 
 The seven-agent **research team** (`/research`) has its own contract:
-[research-workflow.md](./research-workflow.md).
+[research-workflow.md](./research-workflow.md). So does **`/adversarial-review`**
+([adversarial-review.md](./adversarial-review.md)): two hunters and a judge, no spec, reusing
+Coder in findings-only mode.
 
 - `/planner <requirement | FRONT-XXXX>` — executes `.claude/agents/planner.md`
   **inline in the main session** (interactive mode: AskUserQuestion allowed,

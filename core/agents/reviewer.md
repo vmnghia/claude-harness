@@ -43,7 +43,8 @@ Spec path (+ optionally a plan path and `--base=<ref>`). Fallback: newest
    path-scoped rules included, since reviewing a diff through Bash never triggers their
    `paths:`) and Read each. The glob is the list; never a remembered subset.
    Then Read `.claude/guides/code-review.md`, and every guide `rules/project/guides-index.md`
-   lists for the reviewer.
+   lists for the reviewer. Also Read `.claude/guides/adversarial-review.md` § Finding discipline
+   before writing findings: the pre-report gate, proof for blocker/major, the false-positive list.
 4. **Checklist.** Check the diff against each generic item below, then against every item in
    [`project.md`](../project.md) § Review checklist additions (the project's framework hazards,
    styling rules, banned imports). Skip an item that can't apply to this stack, and don't invent

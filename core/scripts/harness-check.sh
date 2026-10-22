@@ -741,6 +741,85 @@ if [ "$H" != "$ROOT/core" ]; then   # installed projects only: globs must match 
   PL=$(paths_lint "$H" "$ROOT"); printf '%s\n' "$PL"; FAILS=$((FAILS + $(printf '%s\n' "$PL" | grep -c FAIL)))
 fi
 
+echo "== 5f. Adversarial review (2026-10-22) =="
+AR="$H/guides/adversarial-review.md"; HUNTER="$H/agents/adversarial-reviewer.md"
+check "guides/adversarial-review.md exists" test -f "$AR"
+for hd in "## Playbook" "## Finding discipline" "## Debate rules" "## Message shapes" "## Procedure" "## Case file" "## Tool boundaries"; do
+  grep -qxF "$hd" "$AR" 2>/dev/null && ok "adversarial-review.md has '$hd'" || fail "adversarial-review.md lacks '$hd'"
+done
+for tok in AGREED WITHDRAWN REFUTED ESCALATED STALEMATE CONTESTED peer_added_evidence new_evidence NO_DIFF review_iter "tree:"; do
+  grep -qF -- "$tok" "$AR" 2>/dev/null && ok "adversarial-review.md mentions $tok" || fail "adversarial-review.md never mentions $tok"
+done
+[ "$(tools_of "$HUNTER")" = "Read, Grep, Glob, Bash" ] && ok "adversarial-reviewer tools are exactly Read, Grep, Glob, Bash" || fail "adversarial-reviewer tools are not exactly 'Read, Grep, Glob, Bash'"
+[ "$(model_of "$HUNTER")" = "claude-opus-5-5" ] && ok "adversarial-reviewer model claude-opus-5-5" || fail "adversarial-reviewer model is not claude-opus-5-5"
+grep -qE 'Read.*guides/adversarial-review\.md' "$HUNTER" 2>/dev/null && ok "adversarial-reviewer Reads guides/adversarial-review.md" || fail "adversarial-reviewer never Reads guides/adversarial-review.md"
+{ grep -qF 'hunter-A' "$HUNTER" && grep -qF 'hunter-B' "$HUNTER"; } 2>/dev/null && ok "adversarial-reviewer knows both roles hunter-A / hunter-B" || fail "adversarial-reviewer lacks hunter-A / hunter-B"
+grep -qF '## Review Checklist' "$HUNTER" 2>/dev/null && fail "adversarial-reviewer still carries the ECC '## Review Checklist' stub section" || ok "adversarial-reviewer dropped the ECC checklist section"
+
+JUDGE="$H/agents/review-judge.md"
+check "agents/review-judge.md exists" test -f "$JUDGE"
+[ "$(tools_of "$JUDGE")" = "Read, Grep, Glob, Bash" ] && ok "review-judge tools are exactly Read, Grep, Glob, Bash" || fail "review-judge tools are not exactly 'Read, Grep, Glob, Bash'"
+[ "$(model_of "$JUDGE")" = "claude-opus-5-5" ] && ok "review-judge model claude-opus-5-5" || fail "review-judge model is not claude-opus-5-5"
+grep -qE 'Read.*guides/adversarial-review\.md' "$JUDGE" 2>/dev/null && ok "review-judge Reads guides/adversarial-review.md" || fail "review-judge never Reads guides/adversarial-review.md"
+for tok in UPHELD REFUTED OUTSIDE_REPO "question:"; do
+  grep -qF -- "$tok" "$JUDGE" 2>/dev/null && ok "review-judge mentions $tok" || fail "review-judge never mentions $tok"
+done
+for a in adversarial-reviewer review-judge; do
+  f="$H/agents/$a.md"; [ -f "$f" ] || continue
+  for t in Edit Write NotebookEdit Agent; do
+    has_tool "$f" "$t" && fail "$a lists $t (hunters and judge are read-only and never dispatch)" || ok "$a does not list $t"
+  done
+done
+
+CODER="$H/agents/coder.md"
+for tok in "FIX FROM ADVERSARIAL REVIEW" "not_applicable" "never fall back to the newest spec"; do
+  grep -qF -- "$tok" "$CODER" && ok "coder.md knows findings-only mode: '$tok'" || fail "coder.md lacks '$tok' (findings-only mode)"
+done
+grep -qF -- '--fix-from-adversarial-review' "$H/commands/coder.md" && ok "commands/coder.md has --fix-from-adversarial-review" || fail "commands/coder.md lacks --fix-from-adversarial-review"
+
+CMD="$H/commands/adversarial-review.md"
+check "commands/adversarial-review.md exists" test -f "$CMD"
+for tok in 'subagent_type: "adversarial-reviewer"' 'subagent_type: "review-judge"' 'subagent_type: "coder"' '--resume' '--no-fix' '--auto' '--max-iter' NO_DIFF STALLED NEEDS_OWNER SendMessage ToolSearch 'by id' 'Recompute `tree`' 'restart the current round' AskUserQuestion; do
+  grep -qF -- "$tok" "$CMD" 2>/dev/null && ok "adversarial-review command mentions $tok" || fail "adversarial-review command never mentions $tok"
+done
+grep -qE 'Read.*guides/adversarial-review\.md' "$CMD" 2>/dev/null && ok "adversarial-review command Reads the guide" || fail "adversarial-review command never Reads guides/adversarial-review.md"
+grep -qE '^1\. \*\*Hunt' "$CMD" 2>/dev/null && fail "adversarial-review command duplicates the round procedure (belongs in the guide)" || ok "adversarial-review command holds no round procedure of its own"
+
+grep -qF 'adversarial-review.md' "$H/CLAUDE.md" && ok "CLAUDE.md indexes guides/adversarial-review.md" || fail "CLAUDE.md does not index adversarial-review.md"
+grep -qF 'review-judge' "$H/CLAUDE.md" && ok "CLAUDE.md lists review-judge" || fail "CLAUDE.md does not list review-judge"
+grep -qF 'adversarial-review.md' "$WF" && ok "ai-workflow.md points at adversarial-review.md" || fail "ai-workflow.md never mentions adversarial-review.md"
+grep -qE 'Read.*guides/adversarial-review\.md' "$H/agents/reviewer.md" && ok "reviewer Reads guides/adversarial-review.md § Finding discipline" || fail "reviewer never Reads guides/adversarial-review.md"
+
+# live-run defects, 2026-10-22 smoke test: untracked files in the tree hash; plugin stores leak earlier rounds; VALID semantics
+grep -qF 'untracked' "$AR" && ok "adversarial-review.md tree hash covers untracked files" || fail "adversarial-review.md tree hash ignores untracked files (resume would miss a fix to a new file)"
+grep -qF 'untracked' "$CMD" 2>/dev/null && ok "adversarial-review command recomputes tree over untracked files too" || fail "adversarial-review command recomputes tree without untracked files"
+for a in adversarial-reviewer review-judge; do
+  grep -qF '.remember/' "$H/agents/$a.md" 2>/dev/null && ok "$a never reads .remember/ (plugin store leaks earlier rounds)" || fail "$a may grep .remember/ and see earlier rounds' findings"
+done
+grep -qF '.remember/' "$AR" && ok "adversarial-review.md names .remember/ among paths agents never read" || fail "adversarial-review.md does not exclude .remember/"
+grep -qF 'is `AGREED` at once' "$AR" && ok "adversarial-review.md: VALID at the asserter's severity is AGREED at once" || fail "adversarial-review.md leaves cross-examination VALID → AGREED unspecified"
+
+# resume drill, 2026-10-22: the tree hash must not cover .claude/; escalations carry over; scratchpad folders per round
+grep -qF 'tree` never covers `.claude/' "$AR" && ok "adversarial-review.md tree hash excludes .claude/" || fail "adversarial-review.md tree hash covers .claude/ (every case-file write looks like a tree change)"
+grep -qF 'carry over' "$AR" && ok "adversarial-review.md: unanswered ESCALATED/STALEMATE items carry over across rounds" || fail "adversarial-review.md does not say escalations carry over"
+grep -qF 'own subfolder' "$AR" && ok "adversarial-review.md: each round's agents get their own scratchpad subfolder" || fail "adversarial-review.md does not isolate scratchpad folders per round"
+
+# final review fix pass, 2026-10-22: execution points an orchestrator had to guess
+grep -qF 'second `CHALLENGE`' "$AR" && ok "adversarial-review.md: judge ladder ends on the challenger's second CHALLENGE, no content check" || fail "adversarial-review.md: judge-ladder termination needs a content judgement"
+grep -qF 'both sides are exhausted, or the cap' "$AR" && ok "adversarial-review.md: a finding stalemates when both sides are exhausted or the cap" || fail "adversarial-review.md: exhaustion (one side or both) is ambiguous"
+grep -qF 'same_as' "$AR" && ok "adversarial-review.md: duplicate findings merge via same_as" || fail "adversarial-review.md has no rule for duplicate findings"
+grep -qF 'one block per phase' "$AR" && ok "adversarial-review.md: a reply may carry one block per phase asked" || fail "adversarial-review.md: added findings cannot be ruled on in a turn reply"
+grep -qF '`CLARIFY` carrying the re-graded severity' "$AR" && ok "adversarial-review.md: the asserter accepts a re-grade with CLARIFY" || fail "adversarial-review.md tells the asserter to ACCEPT (a challenger response)"
+grep -qF 'before the breaker' "$AR" && ok "adversarial-review.md: Coder rejections are judged before the breaker" || fail "adversarial-review.md: the breaker punishes Coder for correct rejections"
+grep -qF 'relays only the blocks' "$AR" && ok "adversarial-review.md: the orchestrator relays blocks, not prose" || fail "adversarial-review.md relays unbounded prose"
+for a in adversarial-reviewer review-judge; do grep -qF '20 lines' "$H/agents/$a.md" && ok "$a bounds its prose" || fail "$a has no prose bound"; done
+grep -qF 'estimated cost' "$CMD" && ok "adversarial-review command prints an estimated cost before dispatching" || fail "adversarial-review command never estimates cost"
+grep -qF 'xargs -0 -r' "$AR" && grep -qF 'show-toplevel' "$AR" && ok "adversarial-review.md tree pipeline runs from the repo root and skips sha256sum with no files" || fail "adversarial-review.md tree pipeline hangs on stdin with no untracked files or depends on cwd"
+grep -qF 'the base ref, the diff' "$AR" && ok "adversarial-review.md judge capsule carries the base ref" || fail "adversarial-review.md judge capsule lacks the base ref"
+if [ "$H" = "$ROOT/core" ]; then   # harness repo only: the design doc is not installed
+  grep -qF 'after the resume drill' "$ROOT/docs/2026-10-22-adversarial-review-design.md" && ok "design § Verified says which fixes landed after the resume drill" || fail "design § Verified misstates when the live-run fixes landed"
+fi
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
