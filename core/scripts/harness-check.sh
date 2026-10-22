@@ -305,6 +305,64 @@ if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then
   rm -rf "$IT6"
 fi
 
+echo "== 2i. review-bash-gate matrix (2026-10-22) =="
+# Hunters and the judge get Bash for read-only git and throwaway scripts under the session scratchpad,
+# nothing else. Registered in their own frontmatter, so the main session and other agents are unaffected.
+RGATE="$H/hooks/review-bash-gate.sh"
+check "review-bash-gate.sh exists+executable" test -x "$RGATE"
+check "review-bash-gate.sh bash syntax" bash -n "$RGATE"
+RSCR=/tmp/claude-1000/-x/sess/scratchpad
+rgate() { # rgate <expected-exit> <label> <command> [agent_type, default adversarial-reviewer; "-" = none]
+  local expect="$1" label="$2" got who="${4:-adversarial-reviewer}"
+  WHO="$who" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j={tool_name:"Bash",tool_input:{command:d}};if(process.env.WHO!=="-")j.agent_type=process.env.WHO;process.stdout.write(JSON.stringify(j))})' <<<"$3" \
+    | "$RGATE" >/dev/null 2>&1; got=$?
+  if [ "$got" -eq "$expect" ]; then ok "[review-bash] $label → exit $got"; else fail "[review-bash] $label → exit $got (expected $expect)"; fi
+}
+rgate 0 "git diff base"            "git diff abc123 -- src"
+rgate 0 "git log oneline"          "git log --oneline -5"
+rgate 0 "git diff | head"          "git diff HEAD | head -50"
+rgate 0 "git check-ignore"         "git check-ignore -q .claude/runs"
+rgate 0 "git ls-files pipeline"    "git ls-files --others --exclude-standard -z | sort -z | xargs -0 -r sha256sum"
+rgate 0 "node scratchpad script"   "node $RSCR/adv-r1-hunter-A/probe.js"
+rgate 0 "python3 -I scratchpad"    "python3 -I $RSCR/adv-r1-hunter-B/p.py"
+rgate 0 "heredoc into scratchpad"  "cat > $RSCR/adv-r1-hunter-A/probe.js <<'EOF'
+console.log(1)
+EOF"
+rgate 0 "mkdir -p scratchpad"      "mkdir -p $RSCR/adv-r1-hunter-A"
+rgate 0 "cd scratchpad && node"    "cd $RSCR/adv-r1-hunter-A && node probe.js"
+rgate 0 "cat a repo file"          "cat src/retry.js"
+rgate 0 "grep -rn excluding dirs"  "grep -rn --exclude-dir=.claude --exclude-dir=.remember publishWithBackoff src"
+rgate 2 "git add"                  "git add -A"
+rgate 2 "git commit"               "git commit -m x"
+rgate 2 "git stash"                "git stash"
+rgate 2 "git restore"              "git restore src/x.js"
+rgate 2 "node -e inline"           "node -e 'require(\"fs\").writeFileSync(\"x\",\"1\")'"
+rgate 2 "node script in repo"      "node scripts/probe.js"
+rgate 2 "python3 without -I"       "python3 $RSCR/p.py"
+rgate 2 "heredoc into repo"        "cat > src/x.js <<'EOF'
+x
+EOF"
+rgate 2 "redirect into repo"       "git diff > notes.txt"
+rgate 2 "rm -rf"                   "rm -rf src"
+rgate 2 "npm run build"            "npm run build"
+rgate 2 "curl"                     "curl https://example.com"
+rgate 2 "sed -i"                   "sed -i s/a/b/ src/x.js"
+rgate 2 "scratchpad path with .."  "node $RSCR/../../etc/x.js"
+rgate 2 "allowed && denied"        "git diff && git add -A"
+rgate 2 "command substitution"     "node \$(echo $RSCR/p.js)"
+rgate 2 "judge: git add"           "git add -A"                         review-judge
+rgate 0 "coder: git add passes"    "git add -A"                         coder
+rgate 0 "main session: rm passes"  "rm -rf build"                       -
+rgate 0 "research-lead: curl passes" "curl https://example.com"         research-lead
+printf 'not-json' | "$RGATE" >/dev/null 2>&1; [ $? -eq 2 ] && ok "[review-bash] malformed JSON → deny" || fail "[review-bash] malformed JSON → deny"
+printf '' | "$RGATE" >/dev/null 2>&1; [ $? -eq 2 ] && ok "[review-bash] empty input → deny" || fail "[review-bash] empty input → deny"
+grep -qF 'review-bash-gate.sh' "$H/settings.json" && ok "settings.json registers review-bash-gate on PreToolUse(Bash)" || fail "settings.json does not register review-bash-gate.sh (a frontmatter hook never fires for PreToolUse: measured 2026-10-22)"
+for a in adversarial-reviewer review-judge; do
+  awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{exit} f' "$H/agents/$a.md" 2>/dev/null | grep -qF 'hooks:' \
+    && fail "$a frontmatter carries a hooks: block (never fires for PreToolUse; register in settings.json)" || ok "$a frontmatter has no hooks: block"
+done
+grep -qF 'review-bash-gate.sh' "$H/CLAUDE.md" && ok "CLAUDE.md Hooks table names review-bash-gate.sh" || fail "CLAUDE.md Hooks table lacks review-bash-gate.sh"
+
 echo "== 3. Config validity =="
 check ".claude/settings.json parses" node -e "JSON.parse(require('fs').readFileSync('$H/settings.json','utf8'))"
 if [ -f "$ROOT/.mcp.json" ]; then
@@ -830,6 +888,39 @@ grep -qF 'SUPERSEDED' "$AR" && ok "adversarial-review.md: an abandoned round att
 for f in "$AR" "$HUNTER" "$JUDGE"; do grep -qF 'git check-ignore' "$f" && ok "$(basename "$f") whitelists git check-ignore" || fail "$(basename "$f") lacks git check-ignore in the read-only git list"; done
 grep -qF 'only the field names' "$HUNTER" && ok "adversarial-reviewer uses only the guide's field names" || fail "adversarial-reviewer may invent field names"
 grep -qF 'scratchpad' "$CODER" && ok "coder.md allows scratchpad probe scripts" || fail "coder.md cannot run a probe script to check its own fix"
+
+sed -n 's/^description: //p' "$HUNTER" | head -1 | grep -qF '/adversarial-review' && ok "adversarial-reviewer description is scoped to /adversarial-review" || fail "adversarial-reviewer description invites auto-dispatch of a lone hunter"
+
+# installer: .claude/runs/ must be ignored (the case file and the feature-flow run log live there)
+if [ "$H" = "$ROOT/core" ]; then
+  IT=$(mktemp -d); git -C "$IT" init -q; printf 'node_modules\n' > "$IT/.gitignore"
+  bash "$ROOT/install.sh" "$IT" >/dev/null 2>&1
+  grep -qxF '.claude/runs/' "$IT/.gitignore" && ok "install.sh adds .claude/runs/ to .gitignore" || fail "install.sh does not add .claude/runs/ to .gitignore"
+  sed -i '/^\.claude\/runs\/$/d' "$IT/.gitignore"; bash "$ROOT/install.sh" --update "$IT" >/dev/null 2>&1
+  grep -qxF '.claude/runs/' "$IT/.gitignore" && ok "install.sh --update restores the .claude/runs/ ignore" || fail "install.sh --update does not restore the .claude/runs/ ignore"
+  bash "$ROOT/install.sh" --update "$IT" >/dev/null 2>&1; [ "$(grep -cxF '.claude/runs/' "$IT/.gitignore")" = 1 ] && ok "install.sh never duplicates the ignore line" || fail "install.sh duplicated the ignore line"
+  rm -rf "$IT"
+fi
+# verify-quote: SSRF hardening (2026-10-22) — https or data only; no loopback, private, link-local or unspecified targets; redirects re-checked
+VQ="$H/scripts/verify-quote.sh"
+vq() { # vq <expected-exit> <label> <url> <reason-regex>
+  local out; out=$(bash "$VQ" "$3" "hello" 2>/dev/null); local got=$?
+  if [ "$got" -eq "$1" ] && printf '%s' "$out" | grep -qiE "$4"; then ok "[verify-quote] $2 → $out"; else fail "[verify-quote] $2 → exit $got '$out' (expected $1 /$4/)"; fi
+}
+vq 2 "http scheme refused"      "http://example.com/"                      "scheme"
+vq 2 "loopback literal refused" "https://127.0.0.1/"                       "private|loopback"
+vq 2 "localhost refused"        "https://localhost/"                       "private|loopback"
+# literal addresses are built with printf so the leak check's IPv4 pattern never sees one in source
+vq 2 "link-local refused"       "https://$(printf '%d.%d.%d.%d' 169 254 169 254)/latest/meta-data" "private|link-local"
+vq 2 "RFC1918 refused"          "https://$(printf '%d.%d.%d.%d' 10 0 0 1)/"     "private"
+vq 2 "v4-mapped v6 (hex) refused"    "https://[::ffff:7f00:1]/"            "private|embeds"
+vq 2 "v4-mapped v6 (dotted) refused" "https://[::ffff:$(printf '%d.%d.%d.%d' 127 0 0 1)]/" "private|embeds"
+vq 2 "NAT64 refused"                 "https://[64:ff9b::7f00:1]/"          "private|embeds"
+vq 2 "6to4 refused"                  "https://[2002:7f00:1::1]/"           "private|embeds"
+vq 2 "IPv4-compatible v6 refused"    "https://[::7f00:1]/"                 "private|embeds"
+vq 2 "IPv6 loopback refused"    "https://[::1]/"                           "private|loopback"
+vq 2 "unspecified refused"      "https://0.0.0.0/"                         "private|unspecified"
+vq 0 "data: positive control"   "data:text/html,$(printf 'a%.0s' $(seq 1 250)) hello world" "MATCH"
 
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true

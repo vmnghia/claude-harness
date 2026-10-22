@@ -60,6 +60,13 @@ write_manifest() { # write_manifest <file listing "<hash>  <path>" lines>
   { echo "# claude-code-harness manifest — do not edit"; echo "version $VERSION"; echo "source $SRC_DISP"; cat "$1"; } > "$MAN"
 }
 
+ensure_ignore() { # ensure_ignore <repo>: .claude/runs/ holds run logs and review case files; never commit them
+  local gi="$1/.gitignore"
+  grep -qxF '.claude/runs/' "$gi" 2>/dev/null && return 0
+  if [ -s "$gi" ] && [ "$(tail -c1 "$gi" | od -An -c | tr -d ' ')" != '\n' ]; then echo >> "$gi"; fi
+  echo '.claude/runs/' >> "$gi"; echo "  .gitignore: added .claude/runs/"
+}
+
 case "$MODE" in
 install)
   [ -f "$MAN" ] && { echo "install: already installed ($MAN). Use --update." >&2; exit 2; }
@@ -78,6 +85,7 @@ install)
   if [ -e "$DEST/project.md" ]; then echo "  project.md: kept existing"
   else cp "$SRC/project-template/project.md" "$DEST/project.md"; echo "  project.md: seeded from template, fill in the TODOs"; fi
   write_manifest "$TMP"; rm -f "$TMP"
+  ensure_ignore "$(dirname "$DEST")"
   echo "installed $(core_files | wc -l) files, version $VERSION, into $DEST"
   echo "next: fill in $DEST/project.md, then run: bash $DEST/scripts/harness-check.sh"
   ;;
@@ -113,6 +121,7 @@ update)
   done < <(man_entries || true)
   merge_settings
   write_manifest "$TMP"; rm -f "$TMP"
+  ensure_ignore "$(dirname "$DEST")"
   echo "update to $VERSION: $NEW new, $UPD replaced, $KEPT kept with .harness-new, $RET retired"
   ;;
 doctor)

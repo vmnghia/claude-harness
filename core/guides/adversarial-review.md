@@ -526,6 +526,12 @@ block is appended as the agent wrote it.
 `git rev-parse`, `git branch --show-current`, `git check-ignore`, `git ls-files`. Nothing
 state-mutating.
 
+**Enforced, not only asked** (2026-10-22): `hooks/review-bash-gate.sh`, a PreToolUse hook on Bash
+in `settings.json` that applies itself only when the call's `agent_type` is `adversarial-reviewer`
+or `review-judge`, denies everything outside this list and the script rules below, and fails
+closed. (A hook in an agent file's frontmatter never fired for PreToolUse: measured 2026-10-22.) A denial is policy: reformulate within the list, never work
+around it.
+
 **Scratchpad scripts:** a throwaway script written with a Bash heredoc under the session
 scratchpad path from the capsule, run with `node <path>` or `python3 -I <path>`. Every agent
 gets its **own subfolder** in the capsule (`<scratchpad>/adv-r<N>-<role>/`, the orchestrator

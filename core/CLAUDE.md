@@ -91,6 +91,7 @@ don't retry, rephrase or work around it.
 | `session-context.sh` | SessionStart | prints branch, dirty files, newest spec+plan, test-runner presence, harness drift, this session's `session=` id, and any active lock |
 | `confluence-draft-gate.sh` | PreToolUse, **in `research-lead.md`'s frontmatter** | research-lead may write Confluence drafts only |
 | `quote-verify-gate.sh` | Stop, **in `web-reader.md`'s frontmatter** | every quote web-reader cites must be a verbatim substring of its page |
+| `review-bash-gate.sh` | PreToolUse(Bash) | for calls whose `agent_type` is `adversarial-reviewer` or `review-judge` only: allows read-only git and throwaway scripts under the session scratchpad, denies the rest, fails closed; every other caller passes |
 
 Hooks read project facts through `hooks/lib/project-config.js` and fall back to defaults when
 `project.md` is absent. They need `node` ≥18 on `PATH`. The quote gate parses YAML with the

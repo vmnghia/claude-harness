@@ -349,6 +349,14 @@ missing `project.md`; resume runs the branch gate when fixes are on and marks an
 attempt's findings `SUPERSEDED`; the command warns when `.claude/runs/` is not gitignored;
 `git check-ignore` and `git ls-files` are on the read-only list; hunters use only the guide's
 field names.
+The owner then asked for the rest: the Bash boundary is now enforced by `hooks/review-bash-gate.sh`,
+a PreToolUse(Bash) hook in `settings.json` that scopes itself by the call's `agent_type`
+(36-case matrix in `harness-check` §2i, and proven live: a dispatched hunter's `git stash list`
+was denied with the policy text while `git status` ran; a frontmatter hook never fired for
+PreToolUse, measured 2026-10-22), the installer adds
+`.claude/runs/` to the project's `.gitignore`, the hunter's description is scoped to the
+command, and `verify-quote.sh` refuses non-https and private targets and re-checks every
+redirect hop.
 
 ## Left to the builder
 

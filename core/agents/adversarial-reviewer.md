@@ -1,6 +1,6 @@
 ---
 name: adversarial-reviewer
-description: Expert code review specialist. Work with another agent of the same kind. Proactively reviews code for quality, security, and maintainability.
+description: Expert code review specialist. Work with another agent of the same kind. Proactively reviews code for quality, security, and maintainability. Dispatched by /adversarial-review only, two per round with a hunt capsule; not for direct use.
 tools: Read, Grep, Glob, Bash
 model: claude-opus-5-5
 ---
