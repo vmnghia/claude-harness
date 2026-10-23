@@ -225,7 +225,7 @@ grep -qF 'no hook enforces it' "$MSR" && fail "multi-session.md still says no ho
 grep -qF 'Never edit a peer' "$MSR" && ok "multi-session.md forbids editing a peer's lock (incl. owner_session)" || fail "multi-session.md lacks 'Never edit a peer's lock'"
 grep -qF 'on create, message only' "$MSR" && ok "multi-session.md §6 agrees with §3 (busy-only on create)" || fail "multi-session.md §6 contradicts §3 on create messages"
 grep -qE 'Message peers \*\*before\*\* registering' "$MSR" && fail "multi-session.md §2 still asks to message all peers before a hook change" || ok "multi-session.md §2 hook/install announcements follow busy-only"
-grep -qF 'lock-gate.sh' "$H/CLAUDE.md"grep -qF 'lock-gate.sh' "$H/CLAUDE.md" && ok "CLAUDE.md Hooks table names lock-gate.sh" || fail "CLAUDE.md Hooks table lacks lock-gate.sh"
+grep -qF 'lock-gate.sh' "$H/CLAUDE.md" && ok "CLAUDE.md Hooks table names lock-gate.sh" || fail "CLAUDE.md Hooks table lacks lock-gate.sh"
 
 echo "== 2f. Review minors (2026-10-21) =="
 for a in tester repro-driver incident-investigator research-lead; do
@@ -927,7 +927,7 @@ echo "== 5g. Team flow (2026-10-22) =="
 for hd in "## Team protocol" "### Roster and run document" "### Message shapes" "### Questions" "### Blockers and decisions" "### Councils" "### Bounds" "### Resume" "## Procedure"; do
   grep -qxF "$hd" "$WF" && ok "ai-workflow.md has '$hd'" || fail "ai-workflow.md lacks '$hd'"
 done
-for tok in QUESTION ANSWER OBJECTION POSITION DECISION decisions_applied questions_asked gate_iter "--max-gate-iter" "by: lead | council | owner | assumed" NEEDS_OWNER "then resume the asker" "cannot be settled by the lead" "when the asker next goes idle" "`main` only" "cost line" "standby brief"; do
+for tok in QUESTION ANSWER OBJECTION POSITION DECISION decisions_applied questions_asked gate_iter "--max-gate-iter" "by: lead | council | owner | assumed" NEEDS_OWNER "then resume the asker" "cannot be settled by the lead" "when the asker next goes idle" '`main` only' "cost line" "standby brief"; do
   [ "$tok" = "--" ] && continue
   grep -qF -- "$tok" "$WF" && ok "ai-workflow.md mentions $tok" || fail "ai-workflow.md never mentions $tok"
 done
