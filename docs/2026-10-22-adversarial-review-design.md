@@ -333,6 +333,10 @@ branch with `install.sh`; runs in fresh `claude -p --model claude-opus-5-5` sess
 
 Cost: smoke run $11.47 over about 23 minutes; resume drills $3.33 and $3.15; real run $5.78.
 
+Since 2026-10-22 the gate is also reached from `/feature-flow` (the team flow,
+`docs/2026-10-22-team-flow-design.md`): hunters may route one question per finding to Coder
+through the lead, and Coder is resumed rather than re-dispatched.
+
 Harness defects the live runs surfaced, all fixed on this branch. Found by the smoke run and
 fixed before the resume drill: the tree hash must cover untracked files; hunters and the judge
 must never grep `.remember/`, `.claude/runs/`, `.claude/investigations/`, `.claude/specs/` (the
