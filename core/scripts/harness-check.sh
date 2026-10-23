@@ -922,6 +922,75 @@ vq 2 "IPv6 loopback refused"    "https://[::1]/"                           "priv
 vq 2 "unspecified refused"      "https://0.0.0.0/"                         "private|unspecified"
 vq 0 "data: positive control"   "data:text/html,$(printf 'a%.0s' $(seq 1 250)) hello world" "MATCH"
 
+echo "== 5g. Team flow (2026-10-22) =="
+# ai-workflow.md is the contract: § Team protocol subsections and § Procedure; new tokens
+for hd in "## Team protocol" "### Roster and run document" "### Message shapes" "### Questions" "### Blockers and decisions" "### Councils" "### Bounds" "### Resume" "## Procedure"; do
+  grep -qxF "$hd" "$WF" && ok "ai-workflow.md has '$hd'" || fail "ai-workflow.md lacks '$hd'"
+done
+for tok in QUESTION ANSWER OBJECTION POSITION DECISION decisions_applied questions_asked gate_iter "--max-gate-iter" "by: lead | council | owner | assumed" NEEDS_OWNER "then resume the asker" "cannot be settled by the lead" "when the asker next goes idle" "`main` only" "cost line" "standby brief"; do
+  [ "$tok" = "--" ] && continue
+  grep -qF -- "$tok" "$WF" && ok "ai-workflow.md mentions $tok" || fail "ai-workflow.md never mentions $tok"
+done
+
+# peers: § Team sections, SendMessage boundary, contract pairs
+for a in coder tester reviewer planner; do
+  for hd in "### When you ask" "### When you are asked" "### When a decision arrives" "### When you object"; do
+    grep -qxF "$hd" "$H/agents/$a.md" && ok "$a has '$hd'" || fail "$a lacks '$hd'"
+  done
+  grep -qF 'Without a roster in your capsule, this section does not apply' "$H/agents/$a.md" && ok "$a: no-roster rule" || fail "$a lacks the no-roster rule"
+done
+for f in "$H"/agents/*.md; do
+  a=$(basename "$f" .md)
+  case " coder tester reviewer planner research-lead incident-investigator " in
+    *" $a "*) has_tool "$f" SendMessage && ok "$a lists SendMessage" || fail "$a should list SendMessage";;
+    *) has_tool "$f" SendMessage && fail "$a lists SendMessage (only the four peers and the two research agents may)" || ok "$a does not list SendMessage";;
+  esac
+done
+pair "decisions_applied" coder.md
+pair "QUESTION" coder.md
+pair "is_decision" tester.md
+pair "OBJECTION" tester.md
+pair "POSITION" planner.md
+pair "rationale" reviewer.md
+
+# hunters' routed question
+grep -qF 'at most one per finding, routed to Coder' "$AR" && ok "adversarial-review.md hunt reply carries questions[] (one per finding, routed to Coder)" || fail "adversarial-review.md hunt reply lacks questions[]"
+grep -qF 'citing `D<n>`' "$AR" && ok "adversarial-review.md: an answer citing D<n> withdraws the finding" || fail "adversarial-review.md lacks the D<n> withdrawal rule"
+grep -qF 'questions[]' "$HUNTER" && ok "adversarial-reviewer knows the routed question (questions[])" || fail "adversarial-reviewer lacks the routed question (questions[])"
+
+# the command: locus and arguments only; the switchboard rule; resume re-dispatches
+FF="$H/commands/feature-flow.md"
+grep -qE 'Read.*ai-workflow\.md' "$FF" && ok "feature-flow Reads ai-workflow.md" || fail "feature-flow never Reads ai-workflow.md"
+for tok in '--max-gate-iter' '--resume' switchboard 'by agent id' 'every id is dead' AskUserQuestion 'adversarial-review.md' 'agent: lead' gate_iter 'cost line' NEEDS_OWNER STALLED; do
+  grep -qF -- "$tok" "$FF" && ok "feature-flow mentions $tok" || fail "feature-flow never mentions $tok"
+done
+for hd in '### Step 3 — Coder' '### Step 4 — Tester'; do
+  grep -qF "$hd" "$FF" && fail "feature-flow still holds the procedure ('$hd'); it belongs in ai-workflow.md § Procedure" || ok "feature-flow holds no '$hd' step"
+done
+
+grep -qF 'Team flow' "$H/CLAUDE.md" && ok "CLAUDE.md names the team flow" || fail "CLAUDE.md still calls it a feature workflow pipeline"
+grep -qF 'switchboard' "$H/CLAUDE.md" && ok "CLAUDE.md says the lead is the switchboard" || fail "CLAUDE.md does not mention the switchboard"
+
+# final-review fix pass (2026-10-23)
+grep -qF 'recorded before the hunt was dispatched' "$AR" && grep -qF 'recorded before the hunt was dispatched' "$WF" && ok "only a decision recorded before the hunt withdraws a finding (both guides)" || fail "a lead can mint a decision inside the gate and withdraw a finding"
+grep -qF 'fresh status block; the step does not advance' "$WF" && ok "ai-workflow.md: a delivered ANSWER yields a fresh status block before the step advances" || fail "ai-workflow.md: non-blocking reconcile has no completion"
+grep -qF 'first option as its `POSITION`' "$WF" && ok "ai-workflow.md: a busy asker's first option stands as its POSITION" || fail "ai-workflow.md: council on a busy peer's question unspecified"
+grep -qF 'case file'"'"'s `review_iter` is `gate_iter`' "$WF" && ok "ai-workflow.md maps gate_iter to the case file's review_iter" || fail "ai-workflow.md never maps gate_iter to the case file"
+grep -qF 'in a team run, a blocking `QUESTION`' "$CODER" && ok "coder.md: a contradictory spec is a blocking QUESTION in a team run" || fail "coder.md still says BLOCKED for a contradictory spec in every run"
+for a in reviewer tester; do grep -qF 'blocking: yes' "$H/agents/$a.md" && ok "$a: its per-finding question is blocking" || fail "$a: per-finding question blocking-ness unspecified"; done
+grep -qF 'several `QUESTION` blocks in one reply' "$WF" && ok "ai-workflow.md: several questions per pause reply" || fail "ai-workflow.md allows only one QUESTION per reply"
+grep -qF 'The roster lives in the state block only' "$WF" && ok "ai-workflow.md: no roster broadcast (peers address main only)" || fail "ai-workflow.md still broadcasts a roster nobody uses"
+grep -qF 'send the roster to all' "$FF" && fail "feature-flow still broadcasts the roster" || ok "feature-flow holds no roster broadcast"
+grep -qF '`assumed` decision is treated as `council`' "$WF" && ok "ai-workflow.md: objection to an assumed decision has a route" || fail "ai-workflow.md: objection to an assumed decision has no route"
+for a in coder tester reviewer planner; do grep -qF 'A reply that is only an `ANSWER`, a `POSITION`' "$H/agents/$a.md" && ok "$a: standby replies carry no status block" || fail "$a: standby replies would carry a bogus status block"; done
+grep -qF 'unless `--no-test`' "$WF" && ok "ai-workflow.md: Tester after a gate fix respects --no-test" || fail "ai-workflow.md: Tester after a gate fix ignores --no-test"
+grep -qE 're-dispatch Coder' "$WF" && fail "ai-workflow.md § Iteration policy still says re-dispatch Coder" || ok "ai-workflow.md routing says resume, not re-dispatch"
+grep -qF 'into one dispatch' "$FF" && ok "feature-flow: never collapse into one dispatch (wording restored)" || fail "feature-flow: 'collapse into one' contradicts the one-message team-up"
+grep -qF 'quoting the spec line' "$WF" && ok "ai-workflow.md: move 1 must quote the spec line" || fail "ai-workflow.md: move 1 has no criterion"
+grep -qF 'context is at risk' "$WF" && ok "ai-workflow.md: the lead stops with the resume command when its context is at risk" || fail "ai-workflow.md: no lead-context ceiling rule"
+for a in coder tester reviewer planner; do for tok in is_decision applies_to question_id; do grep -qF "$tok" "$H/agents/$a.md" && ok "$a mentions $tok" || fail "$a never mentions $tok (shape not pinned)"; done; done
+if [ "$H" = "$ROOT/core" ]; then grep -qF 'minted' "$ROOT/docs/2026-10-22-team-flow-design.md" && ok "team-flow design records the minted-decision incident" || fail "team-flow design lacks the minted-decision incident"; fi
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
