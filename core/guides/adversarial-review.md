@@ -226,7 +226,7 @@ is a `major` until someone reads or runs the missing piece.
 | State | Meaning | Goes to |
 |---|---|---|
 | `AGREED` | both affirm, severity reconciled | Coder when `blocker`/`major` |
-| `WITHDRAWN` | the asserter conceded | case file only |
+| `WITHDRAWN` | the asserter conceded, or Coder's answer cited a recorded decision | case file only |
 | `REFUTED` | the challenger's evidence was accepted, or the judge refuted it and nobody overturned that | case file only |
 | `ESCALATED` | reduced to one named question outside the repo | the owner |
 | `STALEMATE` | ladder exhausted | the owner, with the whole chain |
@@ -276,9 +276,20 @@ phase: hunt
 status: FINDINGS | CLEAN
 payload:
   findings: []            # finding shape; empty with CLEAN
+  questions: []           # at most one per finding, routed to Coder through the lead: {finding_id, to: coder, question}
   summary: <one line>
 ---
 ```
+
+A hunter's question is the one thing it may ask the author: "was this a choice?" In
+`/feature-flow` the orchestrator sends it to Coder by id and appends the `ANSWER` to the
+cross-examination capsule. An answer citing `D<n>` withdraws the finding only when that decision
+was recorded before the hunt was dispatched, and the `DECISION` block is quoted beside the
+`ANSWER` so the hunter can object to it informedly (an `OBJECTION` to the lead, recorded, not
+debated). An `is_decision: yes` answer with no decision id is evidence for the cross-examination,
+never a withdrawal; the orchestrator records no decision between a hunt's dispatch and that
+round's synthesis. In the standalone command there is no
+Coder to ask: the questions are reported to the owner in the recap and the finding proceeds.
 
 ### Cross-examination message (orchestrator → hunter)
 
@@ -393,7 +404,8 @@ The command executes this section. It holds no procedure of its own.
 ### A round
 
 1. **Hunt.** Dispatch two `adversarial-reviewer` agents in **one message** so they run in
-   parallel: `hunter-A` with angle `inside-out`, `hunter-B` with angle `outside-in`, each with
+   parallel (then, in `/feature-flow`, relay each hunt reply's `questions[]` to Coder and append
+   the answers to the cross-examination message): `hunter-A` with angle `inside-out`, `hunter-B` with angle `outside-in`, each with
    the hunt capsule. Record both agent ids in the state block. Append both hunt replies.
 2. **Cross-examine.** Send each hunter the other's findings (by agent id). Append both replies.
    A finding ruled `VALID` at the asserter's own severity is `AGREED` at once, no turn needed.

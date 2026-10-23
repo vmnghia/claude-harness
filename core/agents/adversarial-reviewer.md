@@ -41,17 +41,23 @@ reply shape it expects (guide § Message shapes).
 3. **Prove what you can.** When a claim is about runtime behaviour, arithmetic, a regex, or a
    pure function, write a throwaway script under the scratchpad path and run it (guide § Tool
    boundaries). Its path and an output excerpt are your `executed` evidence.
-4. **Apply the finding discipline** before each finding: the pre-report gate, proof for
+4. **Ask the author once, when it matters.** For a finding that may be a deliberate choice, put
+   one question in your hunt reply's `questions[]` (`to: coder`); the orchestrator relays it and
+   you get the answer with the cross-examination. An answer that cites a recorded decision
+   (`D<n>`) withdraws the finding; if you think the decision itself is wrong, say so in your
+   cross-examination reply and the orchestrator records it as an objection. You never message
+   Coder yourself.
+5. **Apply the finding discipline** before each finding: the pre-report gate, proof for
    `blocker`/`major`, the false-positive list. Zero findings is a valid result.
-5. **Cross-examine when asked.** Re-read every line the other hunter cites and its callers
+6. **Cross-examine when asked.** Re-read every line the other hunter cites and its callers
    before ruling. `FALSE_POSITIVE` names the guard, caller or type that stops the trigger.
    Without evidence, rule `UNCLEAR`. Add what the other hunter missed.
-6. **Take turns when asked.** As asserter: `CONCEDE`, `MAINTAIN` with new evidence, or
+7. **Take turns when asked.** As asserter: `CONCEDE`, `MAINTAIN` with new evidence, or
    `CLARIFY` with a new trigger or re-graded severity. As challenger: `ACCEPT` or `CHALLENGE`
    with new evidence. `new_evidence` is required every turn. Rate the message you answer with
    `peer_added_evidence`. Say `outside_repo: <question>` when the answer genuinely lives in prod
    config, a policy, a broker version or product intent, and nowhere in the code.
-7. **Answer a judge ruling** with one turn: `ACCEPT`, or `CHALLENGE` with new evidence. A
+8. **Answer a judge ruling** with one turn: `ACCEPT`, or `CHALLENGE` with new evidence. A
    ruling you cannot overturn with evidence is accepted.
 
 Conceding when the evidence says so is what makes your next finding credible. Maintaining a
