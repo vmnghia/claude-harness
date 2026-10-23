@@ -1,135 +1,106 @@
 ---
-description: End-to-end AI feature flow — Planner → Coder → Tester (loop) → Reviewer (loop) → ready for human apply
-argument-hint: <requirement | FRONT-XXXX> [--auto] [--no-test] [--max-iter=N]
+description: End-to-end AI feature flow as a team — lead (this session) + persistent Planner, Coder, Tester, Reviewer who ask each other questions through the lead, are convened for decisions, then the adversarial-review gate; ends ready for human apply
+argument-hint: <requirement | FRONT-XXXX> [--auto] [--no-test] [--max-iter=N] [--max-gate-iter=N] [--resume [<run-document>]]
 ---
 
-You are the **orchestrator** for the project's AI workflow. Read
-[`.claude/guides/ai-workflow.md`](../guides/ai-workflow.md) first — it is the
-source of truth for the status-block contract, iteration policy, branch
-policy, and the spec+plan pair convention.
+Contract: Read [`.claude/guides/ai-workflow.md`](../guides/ai-workflow.md) first and execute its
+**§ Procedure** exactly, under its § Team protocol. This file selects where each phase runs and
+how arguments and the owner's answers get in; the steps, the blocks, the bounds, the decision
+rules and the exits live in the guide. The gate is
+[`.claude/guides/adversarial-review.md`](../guides/adversarial-review.md) § Procedure, run with
+this session as its orchestrator.
+
+You are the **lead**. You decide what the spec settles, convene the team for what it does not,
+and bring the rest to the owner. You are also the **switchboard**: peers cannot reach each other
+(measured, see the guide), so every `QUESTION`, `ANSWER` and `OBJECTION` a peer sends to `main`
+is forwarded by you, verbatim, to the peer named in its `to:`, **by agent id** from the roster,
+never by name. You judge nothing you forward. You write the run document; nobody else does.
 
 ## Input
 
-Raw arguments: `$ARGUMENTS`.
+Raw arguments: `$ARGUMENTS`. Parse out:
 
-Parse out:
+- A positional requirement string OR a `FRONT-XXXX` Jira key. Required unless `--resume`.
+- `--auto` → no owner pauses: planning as a subagent dispatch with a context capsule; owner-only
+  decisions go to a council and become `by: assumed` when it converges, `NEEDS_OWNER` when it
+  does not (guide § Blockers and decisions).
+- `--no-test` → no Tester standby, no Tester step, no Tester voice in councils; warn.
+- `--max-iter=N` → cap on `test_iter` and `review_iter` (default 3).
+- `--max-gate-iter=N` → cap on `gate_iter` (default 2).
+- `--resume [<run-document>]` → go to **Resume**.
 
-- A positional requirement string OR a `FRONT-XXXX` Jira key. Required.
-- `--auto` → skip the human-review-spec gate AND run planning as a subagent
-  dispatch instead of inline. Default off.
-- `--no-test` → skip the Tester step (debug only — warn the user). Default off.
-- `--max-iter=N` → override the iteration cap. Default 3 (per loop).
+A positive integer is required for the caps; otherwise warn and use the default. Missing
+requirement without `--resume` → stop with the final block, `status: NEEDS_CLARIFICATION`,
+`summary: "Missing requirement. Usage: /feature-flow <requirement | FRONT-XXXX> [...]"`.
 
-If the positional requirement is missing, stop immediately with a single
-orchestrator status block carrying `status: NEEDS_CLARIFICATION` and
-`summary: "Missing requirement. Usage: /feature-flow <requirement | FRONT-XXXX>"`.
+## Where each phase runs
 
-## State machine
+- **Branch gate:** `git rev-parse --abbrev-ref HEAD` in this session; on a shared branch ask the
+  owner to branch or proceed. Never create the branch yourself. Always, even with `--auto`.
+- **Planning:** inline in this session without `--auto` (AskUserQuestion allowed); with
+  `--auto`, `Agent` with `subagent_type: "planner"` and the context capsule.
+- **Run document:** created and written by you, per the guide § Roster and run document; before
+  creating it, `git check-ignore -q .claude/runs/` (trailing slash) and warn once when it fails.
+- **Team up:** in **one message**, `Agent` dispatches of `subagent_type: "coder"`, `"tester"`,
+  `"reviewer"` and, when planning ran inline, `"planner"` on standby, each with its capsule or
+  standby brief from the guide. Record every id in the state block. No roster message: peers address `main` and name roles,
+  and every message to a standby peer is a wake. Load `SendMessage` once with ToolSearch
+  `select:SendMessage` for the resumes.
+- **Every later step is a resume**, never a re-dispatch: `SendMessage` to the peer's id with the
+  message the guide's § Procedure names ("the tree is ready", "FIX FROM TESTER" + `failures[]`,
+  "FIX FROM REVIEWER" + `findings[]`, "FIX FROM ADVERSARIAL REVIEW" + findings). The same Coder
+  id serves the whole run.
+- **Switchboard:** a peer reply ending in a blocking `QUESTION` is a pause, not a step: no counter
+  moves. Forward it to its `to:` by agent id, or answer it yourself when `to: lead`. Forward the
+  `ANSWER` back the same way. A non-blocking `QUESTION` arrives as a message while the asker is
+  busy: forward it, and deliver the answer when you have it (guide § Questions for the delivery
+  rule). Append every block to the run document as it passes through you.
+- **Decisions:** `DECISION` blocks are written by you into the state block and sent to every
+  peer in `applies_to` **before** you resume the asker. Print a **cost line** before every
+  council round: who is convened and why.
+- **Owner pause:** `AskUserQuestion`, with the team's positions attached, batched at a step
+  boundary unless a peer is blocked now. Not under `--auto`.
+- **Gate:** the adversarial guide's procedure with this session as orchestrator: fresh hunters
+  by `Agent` with `subagent_type: "adversarial-reviewer"`, the judge by `"review-judge"`, Coder
+  **resumed** by id in findings-only mode with the spec and decisions available, Tester resumed
+  after each gate fix, `gate_iter` counted here. A hunt reply's `questions[]` go to Coder by id
+  and the answers into the cross-examination message.
+- **Report:** in this session, the guide § Procedure step 7, then the final block.
 
-Maintain two counters across the run: `test_iter` and `review_iter`, both
-starting at **0**, incrementing on each Coder re-dispatch, never resetting
-(policy in `guides/ai-workflow.md`).
+## Resume
 
-**Run log.** Create `.claude/runs/YYYY-MM-DD-<slug>.md` at Step 1
-(gitignored). After parsing each agent's status block, append it verbatim
-under a `## Step — <agent> (test_iter=N, review_iter=M)` heading. This is
-the evidence trail for debugging multi-iteration loops — keep it current
-even when a step fails.
+`--resume [<run-document>]`: read the state block of the given file, else the newest
+`.claude/runs/*.md` that has one. In its roster every id is dead with the old session: re-dispatch Planner
+(subagent), Coder, Tester and Reviewer fresh, each with the spec, the plan, the full `decisions`
+list and the standby brief; write the new roster into the state block; restart the current `step` from
+its beginning with the counters kept; the gate resumes per its own guide § Resume. Run the branch
+gate again first, since Coder may edit.
 
-### Step 0 — Branch policy gate (always shown, even with `--auto`)
+## Final status block
 
-Check the current branch (`git rev-parse --abbrev-ref HEAD`). If it matches
-`master`, `main`, `stable`, `develop`, or `release/*`, ask the user to
-either (a) create a feature branch named per
-[`git.md`](../rules/git.md) — suggest a name derived from the requirement
-or Jira key — or (b) proceed here. Do not create the branch yourself. Note:
-`.claude/hooks/git-guard.sh` will mechanically deny commits on those
-branches anyway.
-
-### Step 1 — Planning (mode-mapped)
-
-- **Without `--auto`**: read `.claude/agents/planner.md` and execute the
-  procedure **inline in this session** (interactive mode — you may use
-  AskUserQuestion and the session memory already in context).
-- **With `--auto`**: dispatch `subagent_type: "planner"` with the
-  requirement AND a **context capsule**: relevant facts from session
-  memory / this conversation (QA store slugs, version forcing, branch
-  state, test-runner presence from the session-context hook line).
-
-Either way, parse the resulting status block:
-
-- `SPEC_READY` → remember `spec_path` and `plan_path`. Continue.
-- `NEEDS_CLARIFICATION` → STOP. Final orchestrator block with
-  `status: NEEDS_CLARIFICATION`, questions in `summary`.
-
-### Step 2 — Human-review-spec gate
-
-Skipped with `--auto`. Otherwise pause: show `spec_path` + one-line summary
-and ask the user to confirm. Decline → STOP with `NEEDS_CLARIFICATION`
-carrying their feedback.
-
-### Step 3 — Coder (initial)
-
-Dispatch `subagent_type: "coder"` with `<spec_path>` AND `<plan_path>`, no
-fix payload.
-
-- `IMPLEMENTED` → remember `changed_files[]` and `test_result`. Continue.
-- `BLOCKED` → STOP. Final block `status: BLOCKED`, blockers in summary.
-
-### Step 4 — Tester loop
-
-If `--no-test`: warn it was skipped, jump to Step 5. Otherwise:
-
-1. Dispatch `subagent_type: "tester"` with `<spec_path>`.
-2. Parse status:
-   - `PASS` → Step 5.
-   - `BUGS_FOUND` →
-     - `test_iter < max_iter`: `test_iter++`; dispatch Coder with
-       `<spec_path>`, `<plan_path>`, and the `failures[]` payload labeled
-       "FIX FROM TESTER"; after `IMPLEMENTED`, loop to 4.1.
-     - else STOP: `status: BUG_LIMIT_REACHED`, last `failures[]` in summary.
-
-### Step 5 — Reviewer loop
-
-1. Dispatch `subagent_type: "reviewer"` with `<spec_path>` and
-   `<plan_path>` (Reviewer auto-resolves the diff base; pass `--base=<ref>`
-   only if the user specified one).
-2. Parse status:
-   - `APPROVED` → Step 6.
-   - `CHANGES_REQUESTED` →
-     - `review_iter < max_iter`: `review_iter++`; dispatch Coder with the
-       `findings[]` payload labeled "FIX FROM REVIEWER"; after
-       `IMPLEMENTED`, re-run Step 4 (fixes can break tests), then loop to 5.1.
-     - else STOP: `status: REVIEW_LIMIT_REACHED`, last `findings[]` attached.
-
-### Step 6 — Finish
-
-Print a short human-readable recap: spec+plan paths, the run-log path,
-final `changed_files[]`, `test_iter`/`review_iter` used, Tester result (or
-"skipped"), `test_result` when the project has a test runner, remaining `minor`/`nit`
-findings, and the one-line next step: the human runs `git add` /
-`git commit` / `git push` per [`git.md`](../rules/git.md) — never you.
-
-## Final orchestrator status block
-
-Always end with exactly one block:
+Always end with exactly one block, the guide's lead block:
 
 ```yaml
 ---
-agent: orchestrator
-status: READY_FOR_HUMAN_APPLY | BUG_LIMIT_REACHED | REVIEW_LIMIT_REACHED | BLOCKED | NEEDS_CLARIFICATION
+agent: lead
+status: READY_FOR_HUMAN_APPLY | BUG_LIMIT_REACHED | REVIEW_LIMIT_REACHED | BLOCKED | NEEDS_CLARIFICATION | NEEDS_OWNER | STALLED
 spec: <path or "n/a">
 test_iter: <n>
 review_iter: <n>
-summary: <one-line summary>
+gate_iter: <n>
+run_document: <path or "n/a">
+summary: <one line>
 ---
 ```
 
 ## What you do NOT do
 
-- No commits, pushes, branch creation, or state-mutating git. Read-only git
-  for the branch gate only.
-- No source edits by you — all edits flow through Coder so counters and
-  status blocks stay coherent.
-- Never collapse multiple subagent invocations into one dispatch.
-- Never skip the branch gate — `--auto` skips the spec-review gate only.
+- No commits, pushes, branch creation, or state-mutating git. Read-only git for the branch gate
+  and the ignore check only.
+- No source edits by you: all edits flow through Coder, resumed by id, so the counters, the
+  decisions and the run document stay coherent.
+- No judging of what you forward: a `QUESTION` or `ANSWER` passes through verbatim. You judge
+  when you decide, and every decision is a `DECISION` block in the record.
+- Never collapse the team-up dispatches into one dispatch, never re-dispatch a peer whose id is
+  alive, never give a peer another peer's id: they address `main` and you forward.
+- Never skip the branch gate; `--auto` skips owner pauses only.
