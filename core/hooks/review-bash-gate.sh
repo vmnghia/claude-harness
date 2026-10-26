@@ -13,14 +13,22 @@
 #   - a throwaway script under the session scratchpad: `node <path>` or `python3 -I <path>`,
 #     where <path> is /tmp/claude-*/…/scratchpad/… without `..`; `cd` and `mkdir -p` to such a
 #     path; a relative script after a `cd` into one
-#   - writing such a script: a redirect or a *quoted* heredoc whose target is a scratchpad path
-#   - read-only filters: cat, head, tail, wc, grep, rg, sed (never -i), sort, uniq, cut, tr, ls,
-#     find (never -delete/-exec/-ok/-fprint), sha256sum, xargs (only onto sha256sum/wc/grep/cat),
-#     awk (no `>` or system() in the program), diff, comm, jq, stat, basename, dirname, realpath,
-#     pwd, date, echo, printf, true, timeout <allowed command>
-# Denied: any other command word, any redirect outside the scratchpad or /dev/null, `$(`,
-# backticks, `${`, env assignments, unquoted heredocs, `..` in a scratchpad path, and any
-# segment of a compound command that fails the above. Fail closed: unreadable input is denied.
+#   - writing such a script: a redirect, `tee` or a *quoted* heredoc whose targets are all
+#     scratchpad paths
+#   - read-only filters: cat, head, tail, wc, grep, rg (never --pre/--pre-glob/--hostname-bin),
+#     sed (only as `sed --sandbox …`, never -i), sort (never -o/--output/--compress-program),
+#     uniq (at most one file: a second one is written), cut, tr, ls,
+#     find (never -delete/-exec/-execdir/-ok/-okdir/-fprint/-fprint0/-fprintf/-fls), sha256sum,
+#     xargs (only -0 -r -t -x and numeric -n/-P/-L/-s, onto sha256sum/wc/grep/cat),
+#     awk (options -F/-v only; no `>`, system() or `@` in the program), diff, comm, jq, stat,
+#     basename, dirname, realpath, pwd, date, echo, printf, true, timeout <allowed command>
+#   Option checks read the words as the program receives them (`'-i'` is `-i`), and a long option
+#   is denied when it is a prefix of a denied one: GNU tools expand `sort --outp` to `--output`.
+# Denied: any other command word, any redirect (`&>` too) outside the scratchpad or /dev/null,
+# `$(`, backticks, `${`, env assignments, unquoted heredocs, a lone `&` (it runs the next command
+# unchecked), process substitution `<(…)` / `>(…)`, unbalanced quotes, `..` in a scratchpad path,
+# and any segment of a compound command that fails the above. Fail closed: unreadable input is
+# denied. Every bypass closed on 2026-10-26 was measured against this file first.
 # Exit 0 = allow. Exit 2 = deny; stderr is shown to the agent.
 
 INPUT=$(cat)
@@ -60,6 +68,33 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     sha256sum:1, xargs:1, awk:1, diff:1, comm:1, jq:1, stat:1, basename:1, dirname:1, realpath:1, pwd:1,
     date:1, echo:1, printf:1, "true":1 };
   var XARGS_OK = { sha256sum:1, wc:1, grep:1, cat:1 };
+  var FIND_ACTIONS = { "-delete":1, "-exec":1, "-execdir":1, "-ok":1, "-okdir":1, "-fprint":1, "-fprint0":1,
+    "-fprintf":1, "-fls":1 };
+
+  // The command with every quoted or backslash-escaped character replaced by `_`, so operator checks
+  // see only what the shell parses as syntax (`grep "a & b"` has no `&`). null when a quote is open.
+  function unquoted(s) {
+    var out = "", q = "";
+    for (var i = 0; i < s.length; i++) {
+      var c = s[i];
+      if (c === "\\" && q !== "\x27") { out += "__"; i++; continue; }
+      if (q) { if (c === q) { q = ""; out += c; } else out += "_"; continue; }
+      if (c === "\x27" || c === "\"") q = c;
+      out += c;
+    }
+    return q ? null : out;
+  }
+  // GNU tools take any unambiguous prefix of a long option (`sort --outp` is `--output`, `sed --in`
+  // is `--in-place`: measured 2026-10-26), so a long option matches every denied name it prefixes.
+  function longOpt(args, names) {
+    for (var i = 0; i < args.length; i++) {
+      var m = args[i].match(/^--([^=]+)/); if (!m) continue;
+      for (var k = 0; k < names.length; k++) if (names[k].indexOf(m[1]) === 0) return "--" + names[k];
+    }
+    return "";
+  }
+  function some(args, re) { for (var i = 0; i < args.length; i++) if (re.test(args[i])) return args[i]; return ""; }
+  function operands(args) { return args.filter(function (a) { return !/^-/.test(a); }); }
 
   function verdict(cmd, cwd) {
     // 1. Split off a heredoc body: it is script content, scanned for nothing; the delimiter must be quoted.
@@ -73,7 +108,14 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     // 2. No expansion or substitution anywhere in the shell part.
     if (/\$\(|`|\$\{|\$[A-Za-z_]/.test(shell)) return "command substitution or variable expansion";
     if (/^\s*[A-Za-z_][A-Za-z0-9_]*=/.test(shell)) return "environment assignment";
-    // 3. Every segment of a compound command must pass.
+    // 3. Syntax the split below does not model, looked for outside quotes: a lone `&` runs the next
+    //    command unchecked, and `<(…)` / `>(…)` run one inside an argument (measured 2026-10-26).
+    var bare = unquoted(shell);
+    if (bare === null) return "unbalanced quotes";
+    if (/[<>]\(/.test(bare)) return "process substitution <(…) / >(…)";
+    if (/&/.test(bare.replace(/&&|[<>]&(\d+|-)|&>>?/g, ""))) return "a lone & (it would run the next command unchecked)";
+    // 4. Every segment of a compound command must pass. The split ignores quotes, so a separator
+    //    inside quotes only over-splits: the piece after it starts with a quote and is denied.
     var segs = shell.split(/\n|&&|\|\||;|\|(?!\|)/), cwdScratch = false;
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i].trim(); if (!s) continue;
@@ -84,14 +126,16 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
   }
 
   function checkSegment(s, cwdScratch, cwd) {
-    // redirects: only into the scratchpad or /dev/null; fd dups are fine
-    var re = /(^|[^0-9&])(\d*)>>?\s*(\S+)/g, rm;
+    // redirects: only into the scratchpad or /dev/null; fd dups are fine; `&>` is a redirect too
+    var re = /(^|[^0-9&])(\d*|&)>>?\s*(\S+)/g, rm;
     while ((rm = re.exec(s))) {
       var t = rm[3];
       if (/^&\d$/.test(t) || t === "/dev/null") continue;
       if (!isScratch(t)) return "redirect to " + t + " (only the session scratchpad or /dev/null)";
     }
     var w = s.split(/\s+/), cw = w[0];
+    // The arguments as the program receives them: quotes and backslashes removed (`\x27-i\x27` is -i).
+    var args = s.replace(/["\x27\\]/g, "").split(/\s+/).slice(1), hit;
     if (cw === "timeout") { w = w.slice(1); while (w.length && /^-|^\d/.test(w[0])) w = w.slice(1); return checkSegment(w.join(" "), cwdScratch, cwd); }
     if (cw === "git") {
       var gm = s.match(GIT_C), sub = gm ? s.slice(gm[0].length) : "";
@@ -106,27 +150,50 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
       return "allow";
     }
     if (cw === "node" || cw === "python3") {
-      var args = w.slice(1);
-      if (cw === "python3") { if (args[0] !== "-I") return "python3 without -I (isolated mode)"; args = args.slice(1); }
-      if (!args.length || /^-/.test(args[0])) return cw + " with a flag or inline code instead of a scratchpad script";
-      var p = args[0];
+      var nargs = w.slice(1);
+      if (cw === "python3") { if (nargs[0] !== "-I") return "python3 without -I (isolated mode)"; nargs = nargs.slice(1); }
+      if (!nargs.length || /^-/.test(nargs[0])) return cw + " with a flag or inline code instead of a scratchpad script";
+      var p = nargs[0];
       if (isScratch(p)) return "allow";
       if (cwdScratch && !/^\//.test(p) && !/(^|\/)\.\.(\/|$)/.test(p)) return "allow";
       return cw + " script outside the session scratchpad: " + p;
     }
-    if (cw === "cd" || cw === "mkdir") {
-      var tgt = w[w.length - 1];
-      if (cw === "mkdir" && w[1] !== "-p") return "mkdir without -p";
-      return isScratch(tgt) ? "allow" : cw + " outside the session scratchpad: " + tgt;
+    if (cw === "cd" || cw === "mkdir" || cw === "tee") {
+      // Every path operand counts: `tee <repo file> <scratchpad file>` wrote the repo file (measured 2026-10-26).
+      if (cw === "mkdir" && args[0] !== "-p") return "mkdir without -p";
+      var ops = operands(args);
+      if (!ops.length) return cw + " without a scratchpad path";
+      for (var o = 0; o < ops.length; o++) if (!isScratch(ops[o])) return cw + " outside the session scratchpad: " + ops[o];
+      return "allow";
     }
-    if (cw === "tee") return isScratch(w[w.length - 1]) ? "allow" : "tee outside the session scratchpad";
     if (!FILTERS[cw]) return "command \x27" + cw + "\x27 is not on the read-only list";
-    if (cw === "sed" && /(^|\s)-[a-zA-Z]*i/.test(s)) return "sed -i edits in place";
-    if (cw === "find" && /-(delete|exec|execdir|ok|okdir|fprint|fprintf|fls)\b/.test(s)) return "find with a writing or executing action";
-    if (cw === "awk" && /[>]|system\s*\(/.test(s.replace(/^awk\s+/, ""))) return "awk program writes or executes";
+    if (cw === "sed") {
+      // --sandbox makes sed itself refuse e (run a command), r and w (files), and the s///e and s///w
+      // flags. It must come first: after a `--` it is a file name, and e ran (measured 2026-10-26).
+      if (args[0] !== "--sandbox") return "sed without --sandbox as its first argument (sed --sandbox -n \x271,20p\x27 <file>)";
+      if (some(args, /^-[a-zA-Z]*i/) || longOpt(args, ["in-place"])) return "sed -i edits in place";
+    }
+    if (cw === "sort" && (hit = longOpt(args, ["output", "compress-program"]) || (some(args, /^-[a-zA-Z]*o/) ? "-o" : ""))) return "sort " + hit + " writes a file or runs a program";
+    if (cw === "rg" && (hit = longOpt(args, ["pre", "pre-glob", "hostname-bin"]))) return "rg " + hit + " runs a program";
+    if (cw === "uniq" && operands(args).filter(function (a) { return !/^\d+$/.test(a); }).length > 1) return "uniq with a second file writes it";
+    if (cw === "find" && args.some(function (a) { return FIND_ACTIONS[a]; })) return "find with a writing or executing action";
+    if (cw === "awk") {
+      // gawk -f/-i/-l/-E load code and -o/-p/-d write files; `@f()` calls system() indirectly and
+      // @load/@include load code (measured 2026-10-26: `f = "sys" "tem"; @f(…)` ran).
+      if ((hit = some(args, /^-[^Fv-]|^--./))) return "awk option " + hit + " (only -F and -v)";
+      if (/[>@]|system\s*\(/.test(args.join(" "))) return "awk program writes or executes (>, system() or @)";
+    }
     if (cw === "xargs") {
-      var a = w.slice(1); while (a.length && /^-/.test(a[0])) a = a.slice(1);
-      if (!a.length || !XARGS_OK[a[0]]) return "xargs onto \x27" + (a[0] || "") + "\x27 (only sha256sum, wc, grep, cat)";
+      // Only options that take no argument, or a number: one that takes a word (-I, -d, -a, -E, …)
+      // made that word look like the command (measured 2026-10-26: `xargs -I cat sh -c …` ran sh).
+      var a = args, k = 0;
+      while (k < a.length && /^-/.test(a[k])) {
+        if (/^(-0|-r|-t|-x|--null|--no-run-if-empty|--verbose|--exit)$/.test(a[k])) k++;
+        else if (/^-[nPLs]\d+$|^--(max-args|max-procs|max-lines|max-chars)=\d+$/.test(a[k])) k++;
+        else if (/^-[nPLs]$/.test(a[k]) && /^\d+$/.test(a[k + 1] || "")) k += 2;
+        else return "xargs option " + a[k] + " (only -0 -r -t -x and numeric -n/-P/-L/-s)";
+      }
+      if (!XARGS_OK[a[k]]) return "xargs onto \x27" + (a[k] || "") + "\x27 (only sha256sum, wc, grep, cat)";
     }
     return "allow";
   }
