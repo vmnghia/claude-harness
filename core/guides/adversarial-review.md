@@ -535,14 +535,20 @@ block is appended as the agent wrote it.
 | review-judge | ✅ | — | read-only git + scratchpad scripts | — |
 
 **Read-only git:** `git status`, `git diff`, `git log`, `git show`, `git merge-base`,
-`git rev-parse`, `git branch --show-current`, `git check-ignore`, `git ls-files`. Nothing
-state-mutating.
+`git rev-parse`, `git branch --show-current`, `git check-ignore`, `git ls-files`, each
+optionally as `git -C <path> …` (never `-c`: a config override can run a pager or fsmonitor).
+Nothing state-mutating, and never against a repo under `/tmp/claude-*`: a repo written into the
+scratchpad can carry a `.git/config` that executes on `git status` (measured 2026-10-26).
 
 **Enforced, not only asked** (2026-10-22): `hooks/review-bash-gate.sh`, a PreToolUse hook on Bash
 in `settings.json` that applies itself only when the call's `agent_type` is `adversarial-reviewer`
 or `review-judge`, denies everything outside this list and the script rules below, and fails
 closed. (A hook in an agent file's frontmatter never fired for PreToolUse: measured 2026-10-22.) A denial is policy: reformulate within the list, never work
-around it.
+around it. **It is a guardrail against accidental mutation, not a sandbox:** scratchpad scripts
+run unscanned with the session's full privileges, so a hunter steered by its input (e.g. prompt
+injection in the diff) is not contained. Neither are the main session or Coder, which read the
+same diff with full Bash; containment, if ever needed, belongs session-wide (Claude Code's native
+sandbox), not in this gate.
 
 **Scratchpad scripts:** a throwaway script written with a Bash heredoc under the session
 scratchpad path from the capsule, run with `node <path>` or `python3 -I <path>`. Every agent

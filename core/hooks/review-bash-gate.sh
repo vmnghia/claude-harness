@@ -7,7 +7,9 @@
 #
 # Allowed, and nothing else:
 #   - read-only git: status, diff, log, show, merge-base, rev-parse, branch --show-current,
-#     check-ignore, ls-files (never --output)
+#     check-ignore, ls-files (never --output); `git -C <path>` before them is fine, `-c` is not.
+#     Never against a repo under /tmp/claude- (cwd, `cd` or `-C`): a hunter can write one there
+#     whose .git/config runs a command on `git status`
 #   - a throwaway script under the session scratchpad: `node <path>` or `python3 -I <path>`,
 #     where <path> is /tmp/claude-*/…/scratchpad/… without `..`; `cd` and `mkdir -p` to such a
 #     path; a relative script after a `cd` into one
@@ -39,21 +41,27 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     if (who !== "adversarial-reviewer" && who !== "review-judge") return process.stdout.write("allow");
     var cmd = String((j.tool_input || {}).command || "");
     if (!cmd.trim()) return process.stdout.write("empty command");
-    process.stdout.write(verdict(cmd));
+    // `cwd` follows the persisted directory of the Bash tool (measured 2026-10-26), so a `cd` from an
+    // earlier call is visible here.
+    process.stdout.write(verdict(cmd, String(j.cwd || process.cwd())));
   });
+  var path = require("path");
 
   var SCRATCH = /^\/tmp\/claude-[^\/\s]+\/[^\s]*\/scratchpad\/[^\s]*$/;
   function isScratch(p) {
     p = p.replace(/^["\x27]|["\x27]$/g, "");
     return SCRATCH.test(p) && !/(^|\/)\.\.(\/|$)/.test(p) && !/\/\.\.\//.test(p);
   }
-  var GIT_RO = /^git\s+(status|diff|log|show|merge-base|rev-parse|branch\s+--show-current|check-ignore|ls-files)(\s|$)/;
+  // `-C <path>` is the one global option allowed before the subcommand; `-c` stays out (core.pager,
+  // core.fsmonitor and diff.external turn a read-only subcommand into arbitrary execution).
+  var GIT_C = /^git((?:\s+-C\s+(?:"[^"]*"|\x27[^\x27]*\x27|[^\s"\x27]+))*)\s+/;
+  var GIT_RO = /^(status|diff|log|show|merge-base|rev-parse|branch\s+--show-current|check-ignore|ls-files)(\s|$)/;
   var FILTERS = { cat:1, head:1, tail:1, wc:1, grep:1, rg:1, sed:1, sort:1, uniq:1, cut:1, tr:1, ls:1, find:1,
     sha256sum:1, xargs:1, awk:1, diff:1, comm:1, jq:1, stat:1, basename:1, dirname:1, realpath:1, pwd:1,
     date:1, echo:1, printf:1, "true":1 };
   var XARGS_OK = { sha256sum:1, wc:1, grep:1, cat:1 };
 
-  function verdict(cmd) {
+  function verdict(cmd, cwd) {
     // 1. Split off a heredoc body: it is script content, scanned for nothing; the delimiter must be quoted.
     var shell = cmd, m = cmd.match(/<<-?\s*(["\x27]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n/);
     if (m) {
@@ -69,13 +77,13 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     var segs = shell.split(/\n|&&|\|\||;|\|(?!\|)/), cwdScratch = false;
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i].trim(); if (!s) continue;
-      var r = checkSegment(s, cwdScratch); if (r !== "allow") return r;
+      var r = checkSegment(s, cwdScratch, cwd); if (r !== "allow") return r;
       var cdm = s.match(/^cd\s+(\S+)$/); if (cdm && isScratch(cdm[1])) cwdScratch = true;
     }
     return "allow";
   }
 
-  function checkSegment(s, cwdScratch) {
+  function checkSegment(s, cwdScratch, cwd) {
     // redirects: only into the scratchpad or /dev/null; fd dups are fine
     var re = /(^|[^0-9&])(\d*)>>?\s*(\S+)/g, rm;
     while ((rm = re.exec(s))) {
@@ -84,9 +92,16 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
       if (!isScratch(t)) return "redirect to " + t + " (only the session scratchpad or /dev/null)";
     }
     var w = s.split(/\s+/), cw = w[0];
-    if (cw === "timeout") { w = w.slice(1); while (w.length && /^-|^\d/.test(w[0])) w = w.slice(1); return checkSegment(w.join(" "), cwdScratch); }
+    if (cw === "timeout") { w = w.slice(1); while (w.length && /^-|^\d/.test(w[0])) w = w.slice(1); return checkSegment(w.join(" "), cwdScratch, cwd); }
     if (cw === "git") {
-      if (!GIT_RO.test(s)) return "git \x27" + (w[1] || "") + "\x27 is not read-only";
+      var gm = s.match(GIT_C), sub = gm ? s.slice(gm[0].length) : "";
+      if (!GIT_RO.test(sub)) return "git \x27" + (sub.split(/\s+/)[0] || "") + "\x27 is not read-only";
+      // Every path a hunter may write is under /tmp/claude-, and a repo there can carry a .git/config
+      // whose core.fsmonitor runs on `git status` (measured 2026-10-26). Resolve where git will run.
+      if (cwdScratch) return "git run from the scratchpad (a repo written there can execute its config)";
+      var dir = cwd, cre = /-C\s+("[^"]*"|\x27[^\x27]*\x27|[^\s"\x27]+)/g, cm;
+      while ((cm = cre.exec(gm[1]))) dir = path.posix.resolve(dir, cm[1].replace(/^["\x27]|["\x27]$/g, ""));
+      if (/^\/tmp\/claude-/.test(path.posix.normalize(dir) + "/")) return "git against " + dir + " (a repo under /tmp/claude- can execute its config)";
       if (/--output/.test(s)) return "git --output writes a file";
       return "allow";
     }

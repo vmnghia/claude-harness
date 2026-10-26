@@ -312,9 +312,9 @@ RGATE="$H/hooks/review-bash-gate.sh"
 check "review-bash-gate.sh exists+executable" test -x "$RGATE"
 check "review-bash-gate.sh bash syntax" bash -n "$RGATE"
 RSCR=/tmp/claude-1000/-x/sess/scratchpad
-rgate() { # rgate <expected-exit> <label> <command> [agent_type, default adversarial-reviewer; "-" = none]
+rgate() { # rgate <expected-exit> <label> <command> [agent_type, default adversarial-reviewer; "-" = none] [cwd]
   local expect="$1" label="$2" got who="${4:-adversarial-reviewer}"
-  WHO="$who" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j={tool_name:"Bash",tool_input:{command:d}};if(process.env.WHO!=="-")j.agent_type=process.env.WHO;process.stdout.write(JSON.stringify(j))})' <<<"$3" \
+  WHO="$who" CWD="${5:-}" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j={tool_name:"Bash",tool_input:{command:d}};if(process.env.WHO!=="-")j.agent_type=process.env.WHO;if(process.env.CWD)j.cwd=process.env.CWD;process.stdout.write(JSON.stringify(j))})' <<<"$3" \
     | "$RGATE" >/dev/null 2>&1; got=$?
   if [ "$got" -eq "$expect" ]; then ok "[review-bash] $label → exit $got"; else fail "[review-bash] $label → exit $got (expected $expect)"; fi
 }
@@ -323,6 +323,8 @@ rgate 0 "git log oneline"          "git log --oneline -5"
 rgate 0 "git diff | head"          "git diff HEAD | head -50"
 rgate 0 "git check-ignore"         "git check-ignore -q .claude/runs"
 rgate 0 "git ls-files pipeline"    "git ls-files --others --exclude-standard -z | sort -z | xargs -0 -r sha256sum"
+rgate 0 "git -C <repo> diff"       "git -C /srv/repo diff main...HEAD -- src"
+rgate 0 "git -C quoted path log"   "git -C \"/srv/my repo\" log --oneline -5"
 rgate 0 "node scratchpad script"   "node $RSCR/adv-r1-hunter-A/probe.js"
 rgate 0 "python3 -I scratchpad"    "python3 -I $RSCR/adv-r1-hunter-B/p.py"
 rgate 0 "heredoc into scratchpad"  "cat > $RSCR/adv-r1-hunter-A/probe.js <<'EOF'
@@ -336,6 +338,18 @@ rgate 2 "git add"                  "git add -A"
 rgate 2 "git commit"               "git commit -m x"
 rgate 2 "git stash"                "git stash"
 rgate 2 "git restore"              "git restore src/x.js"
+rgate 2 "git -C <repo> add"        "git -C /srv/repo add -A"
+rgate 2 "git -c config (exec)"     "git -c core.pager=sh diff"
+rgate 2 "git -C then -c"           "git -C /srv/repo -c core.fsmonitor=x status"
+# A hunter can write a repo into its scratchpad whose .git/config runs core.fsmonitor (measured
+# 2026-10-26: git status executed it). git must never run against a repo under /tmp/claude-*.
+rgate 2 "git -C scratchpad repo"   "git -C $RSCR/evil status"
+rgate 2 "git -C unnormalized tmp"  "git -C /tmp/./claude-1000/-x/sess/scratchpad/evil status"
+rgate 2 "cd scratchpad && git"     "cd $RSCR/evil && git status"
+rgate 2 "git from scratchpad cwd"  "git status"                         adversarial-reviewer "$RSCR/evil"
+rgate 2 "relative -C into scratch" "git -C evil diff"                   adversarial-reviewer "$RSCR"
+rgate 0 "git from repo cwd"        "git status"                         adversarial-reviewer /srv/repo
+rgate 0 "relative -C out of repo"  "git -C sub/pkg diff"                adversarial-reviewer /srv/repo
 rgate 2 "node -e inline"           "node -e 'require(\"fs\").writeFileSync(\"x\",\"1\")'"
 rgate 2 "node script in repo"      "node scripts/probe.js"
 rgate 2 "python3 without -I"       "python3 $RSCR/p.py"
