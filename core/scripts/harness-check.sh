@@ -28,7 +28,9 @@ check "session-context.sh bash syntax" bash -n "$CTX"
 
 echo "== 2. git-guard matrix (sandboxed) =="
 SANDBOX=$(mktemp -d)
-trap 'rm -rf "$SANDBOX"' EXIT
+SANDBOX2=$(mktemp -d)   # a second repo, on shared `main`, for `git -C` and input-cwd cases
+trap 'rm -rf "$SANDBOX" "$SANDBOX2"' EXIT
+git -C "$SANDBOX2" init -q -b main
 git -C "$SANDBOX" init -q
 git -C "$SANDBOX" config user.email hc@local
 git -C "$SANDBOX" config user.name harness-check
@@ -60,10 +62,27 @@ guard 2 feature "git push origin stable"
 guard 2 feature "git push origin HEAD:release/0.0.1"
 guard 2 feature "git push origin develop"
 guard 2 feature "git push origin staging"
+# Global options between `git` and the subcommand must not hide it (2026-10-26).
+guard 0 feature "git -C . push origin feature/hc-test"
+guard 2 feature "git -C . push origin develop"
+guard 2 feature "git -c core.x=y push --force origin feature/hc-test"
+guard 2 feature "git --no-pager push -f origin feature/hc-test"
+guard 2 feature "git -C . commit --no-verify -m x"
+# The branch is the one in the repo git acts on: the -C target, else the input cwd.
+guard 2 feature "git -C $SANDBOX2 commit -m x"
+guard 0 feature "git -C $SANDBOX2 log --oneline"
+printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"git commit -m x"}}' "$SANDBOX2" \
+  | (cd "$SANDBOX" && CLAUDE_PROJECT_DIR="$SANDBOX" "$GUARD") >/dev/null 2>&1
+[ $? -eq 2 ] && ok "[feature] commit with input cwd on shared main → exit 2" || fail "[feature] commit with input cwd on shared main → expected exit 2"
 
 git -C "$SANDBOX" switch -qc master
 guard 2 shared "git commit -m x"
 guard 2 shared "git push origin some-feature"
+guard 2 shared "git -C . commit -m x"
+guard 2 shared "git -c user.name=x commit -m x"
+guard 2 shared "git --no-pager push origin some-feature"
+git -C "$SANDBOX2" switch -qc feature/other
+guard 0 shared "git -C $SANDBOX2 commit -m x"   # commits to SANDBOX2's feature branch
 
 git -C "$SANDBOX" commit -q --allow-empty -m seed
 git -C "$SANDBOX" checkout -q --detach
