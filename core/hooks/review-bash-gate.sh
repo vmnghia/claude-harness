@@ -24,11 +24,16 @@
 #     basename, dirname, realpath, pwd, date, echo, printf, true, timeout <allowed command>
 #   Option checks read the words as the program receives them (`'-i'` is `-i`), and a long option
 #   is denied when it is a prefix of a denied one: GNU tools expand `sort --outp` to `--output`.
-# Denied: any other command word, any redirect (`&>` too) outside the scratchpad or /dev/null,
-# `$(`, backticks, `${`, env assignments, unquoted heredocs, a lone `&` (it runs the next command
-# unchecked), process substitution `<(…)` / `>(…)`, unbalanced quotes, `..` in a scratchpad path,
-# and any segment of a compound command that fails the above. Fail closed: unreadable input is
-# denied. Every bypass closed on 2026-10-26 was measured against this file first.
+#   Shapes that rewrite words before the program sees them are denied outside quotes: `$'…'` /
+#   `$"…"` (escapes: `$'\x2dexec'` is -exec), brace expansion (`{-i,x}` is two words), and a glob
+#   in the arguments of sed/sort/rg/find/awk/xargs/uniq (a file named `--pre=sh` turned
+#   `rg x *` into running sh on every file: measured 2026-10-26).
+# Denied: any other command word, any redirect (`&>`, `1&>`, `>|`, `<>` too; every unquoted `>`
+# is checked) outside the scratchpad or /dev/null, `$(`, backticks, `${`, env assignments,
+# unquoted heredocs, a lone `&` (it runs the next command unchecked), process substitution
+# `<(…)` / `>(…)`, unbalanced quotes, `..` in a scratchpad path, and any segment of a compound
+# command that fails the above. Fail closed: unreadable input is denied. Every bypass closed on
+# 2026-10-26 was measured against this file first.
 # Exit 0 = allow. Exit 2 = deny; stderr is shown to the agent.
 
 INPUT=$(cat)
@@ -95,6 +100,29 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
   }
   function some(args, re) { for (var i = 0; i < args.length; i++) if (re.test(args[i])) return args[i]; return ""; }
   function operands(args) { return args.filter(function (a) { return !/^-/.test(a); }); }
+  // Tools where a word starting with `-` changes what runs or what is written: an unquoted glob in
+  // their arguments can expand to a file named like an option (measured 2026-10-26: a file named
+  // `--pre=sh` made `rg x *` run sh on each file).
+  var GLOB_SENSITIVE = { sed:1, sort:1, rg:1, find:1, awk:1, xargs:1, uniq:1 };
+  // Every unquoted `>` is a redirect operator (`>`, `>>`, `>|`, `&>`, `N>`, `<>`); its target must be
+  // the scratchpad or /dev/null, and `>&N` / `>&-` fd dups are fine. Scanning the whole command
+  // instead of matching a prefix pattern per segment closes `1&>file` and `>|file` (measured 2026-10-26).
+  function redirects(shell, bare) {
+    for (var i = bare.indexOf(">"); i >= 0; i = bare.indexOf(">", i + 1)) {
+      if (bare[i - 1] === ">") continue;
+      var k = i + 1;
+      if (bare[k] === ">" || bare[k] === "|") k++;
+      var dup = bare[k] === "&"; if (dup) k++;
+      while (k < bare.length && (bare[k] === " " || bare[k] === "\t")) k++;
+      var e = k;
+      while (e < bare.length && !/[\s;&|<>()]/.test(bare[e])) e++;
+      var t = shell.slice(k, e).replace(/["\x27\\]/g, "");
+      if (dup && /^(\d+|-)$/.test(t)) continue;
+      if (t === "/dev/null" || isScratch(t)) continue;
+      return "redirect to " + (t || "nothing") + " (only the session scratchpad or /dev/null)";
+    }
+    return "";
+  }
 
   function verdict(cmd, cwd) {
     // 1. Split off a heredoc body: it is script content, scanned for nothing; the delimiter must be quoted.
@@ -114,6 +142,9 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     if (bare === null) return "unbalanced quotes";
     if (/[<>]\(/.test(bare)) return "process substitution <(…) / >(…)";
     if (/&/.test(bare.replace(/&&|[<>]&(\d+|-)|&>>?/g, ""))) return "a lone & (it would run the next command unchecked)";
+    if (/\$["\x27]/.test(bare)) return "$\x27…\x27 / $\"…\" quoting (its escapes hide what the program receives)";
+    if (/\{[^\s}]*(,|\.\.)/.test(bare)) return "brace expansion {a,b} / {1..3} (it turns one word into several)";
+    var rd = redirects(shell, bare); if (rd) return rd;
     // 4. Every segment of a compound command must pass. The split ignores quotes, so a separator
     //    inside quotes only over-splits: the piece after it starts with a quote and is denied.
     var segs = shell.split(/\n|&&|\|\||;|\|(?!\|)/), cwdScratch = false;
@@ -126,13 +157,6 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
   }
 
   function checkSegment(s, cwdScratch, cwd) {
-    // redirects: only into the scratchpad or /dev/null; fd dups are fine; `&>` is a redirect too
-    var re = /(^|[^0-9&])(\d*|&)>>?\s*(\S+)/g, rm;
-    while ((rm = re.exec(s))) {
-      var t = rm[3];
-      if (/^&\d$/.test(t) || t === "/dev/null") continue;
-      if (!isScratch(t)) return "redirect to " + t + " (only the session scratchpad or /dev/null)";
-    }
     var w = s.split(/\s+/), cw = w[0];
     // The arguments as the program receives them: quotes and backslashes removed (`\x27-i\x27` is -i).
     var args = s.replace(/["\x27\\]/g, "").split(/\s+/).slice(1), hit;
@@ -167,6 +191,11 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
       return "allow";
     }
     if (!FILTERS[cw]) return "command \x27" + cw + "\x27 is not on the read-only list";
+    if (GLOB_SENSITIVE[cw]) {
+      var sb = unquoted(s);
+      if (sb === null) return "unbalanced quotes";
+      if (/[*?[]/.test(sb)) return "unquoted glob in " + cw + " arguments (a file named like an option, e.g. --pre=sh or -i, would become one); quote it, or name the files";
+    }
     if (cw === "sed") {
       // --sandbox makes sed itself refuse e (run a command), r and w (files), and the s///e and s///w
       // flags. It must come first: after a `--` it is a file name, and e ran (measured 2026-10-26).
