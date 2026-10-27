@@ -151,12 +151,13 @@ payload:
    Parallel briefs within a round are partitioned per
    [`guides/thoroughness.md § Width semantics`](thoroughness.md), never duplicated. Plan
    rounds against `--max-iter`: default 3 rounds per teammate per run; `/research --max-iter=N`
-   overrides. At the cap the lead records the gap under Open and goes `PARTIAL`.
+   overrides (it is `knobs.max_iter`). At the cap the lead records the gap under Open, naming
+   the cap, and goes `PARTIAL`.
    `max_agents` is a second ceiling, on dispatches: every fresh agent counts, a resume is free.
-   A round that does not fit is not started: the lead records it under Open naming the
-   ceiling, and goes `PARTIAL` only if that leaves a material Open row
-   (`guides/thoroughness.md § Agent ceiling`). `AWAITING_HUMAN` rounds are uncapped (each is
-   gated by the owner), and a resume is not a dispatch.
+   A round that does not fit is not started: the lead records the gap under Open, naming the
+   ceiling, and goes `PARTIAL` (`guides/thoroughness.md § Agent ceiling`). `AWAITING_HUMAN`
+   pause/resume cycles are uncapped (each is gated by the owner), and a resume is not a
+   dispatch.
 3. **Routing.**
 
    | Teammate result | Lead's action |

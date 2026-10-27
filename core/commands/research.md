@@ -14,12 +14,14 @@ Raw arguments: `$ARGUMENTS`.
 - Empty → stop. Reply only: `Usage: /research <question | FRONT-XXXX> [--max-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] | --resume <investigation-folder>`. Create nothing.
 - Then, if `.claude/agents/research-lead.md` still contains the line starting `> **STUB (`,
   stop. Reply only: `research-lead is still a stub (procedure not written, work item #1); /research can't run yet.` Create nothing.
-- `--max-iter=N` → N must be a positive integer; otherwise warn `--max-iter ignored, using 3` and use 3. Default 3 (the preset does not drive it:
-  `guides/thoroughness.md § Presets`).
+- `--max-iter=N` → N must be a positive integer; otherwise warn
+  `--max-iter ignored, using 3` and use 3. Default 3 (the preset does not drive it:
+  `guides/thoroughness.md § Presets`). The resolved value is `knobs.max_iter`.
 - Thoroughness flags (`--effort`, `--width`, `--dry`, `--max-agents`) → parse and validate per
   [`guides/thoroughness.md`](../guides/thoroughness.md) § Input. Resolve the knobs once, pass
   `knobs:` and `max_agents` in the lead's capsule (New run step 3), and record them in
-  `lead.txt`, so `--resume` reuses them.
+  `lead.txt`, so `--resume` reuses them. The lead counts against the top-level `max_agents`
+  passed here, not `knobs.max_agents`.
 - `--resume <folder>` → go to **Resume**.
 
 ## New run
@@ -47,8 +49,9 @@ Raw arguments: `$ARGUMENTS`.
 
 ## Resume
 
-1. Read `lead_agent_id` from `<folder>/lead.txt`. If the folder, `lead.txt` or the key is
-   missing, stop and say which one is missing.
+1. Read `lead_agent_id` and the `knobs:` / `max_agents:` lines from `<folder>/lead.txt`; reuse
+   them, never re-resolve. If the folder, `lead.txt` or `lead_agent_id` is missing, stop and
+   say which one is missing.
 2. SendMessage to that id. (SendMessage is a deferred tool: load its schema with ToolSearch
    `select:SendMessage` first.) Pick the message by how the lead stopped:
    - Last status block `AWAITING_HUMAN`: "done: <the action from that block>; continue."

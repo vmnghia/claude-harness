@@ -138,8 +138,8 @@ fit:
   recap says the **dry loop was cut at the agent ceiling**, as it does at the `2K` cap.
 
 In `/research` the ceiling never changes the lead's status by itself. A round that does not fit
-is not started; the lead records the gap under Open, naming the ceiling, and goes `PARTIAL` only
-if an Open row that mattered is left unresolved, exactly as it does at a teammate's cap.
+is not started; the lead records the gap under Open, naming the ceiling, and goes `PARTIAL`,
+exactly as it does at a teammate's cap.
 
 The 48 of `thorough` is the session's own Workflow guideline ("keep workflows under 50 agents").
 At `exhaustive` the arithmetic runs the other way: `K = 3` allows 6 dry-check rounds, so a

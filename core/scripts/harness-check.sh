@@ -1191,7 +1191,7 @@ RW="$H/guides/research-workflow.md"; RL="$H/agents/research-lead.md"; RC="$H/com
 tr '\n' ' ' < "$RW" 2>/dev/null | sed 's/  */ /g' | grep -qF 'A round of parallel briefs to one teammate type counts once toward `--max-iter`; the width is the number of agents in that round.' && ok "research-workflow.md holds the counting sentence" || fail "research-workflow.md lacks the counting sentence"
 grep -qF "dispatches 1 and 2 of the searcher's cap" "$RW" "$RL" "$TH" 2>/dev/null \
   && fail "a file still says dispatches 1 and 2 of the searcher's cap" || ok "no 'dispatches 1 and 2' wording left"
-for tok in max_agents partition knobs round; do
+for tok in max_agents partition knobs; do
   grep -qF -- "$tok" "$RL" 2>/dev/null && ok "research-lead.md mentions $tok" || fail "research-lead.md never mentions $tok"
 done
 sed -n '/^1\. \*\*Set up/,/^2\. /p' "$RL" 2>/dev/null | grep -qF 'repro_agent_id' \
@@ -1199,8 +1199,17 @@ sed -n '/^1\. \*\*Set up/,/^2\. /p' "$RL" 2>/dev/null | grep -qF 'repro_agent_id
 grep -qF 'agent_id, status, round }' "$RL" 2>/dev/null && ok "research-lead.md dispatches[] carries round" || fail "research-lead.md dispatches[] lacks round"
 grep -qF 'dispatches[]` (agent, status, round)' "$RW" 2>/dev/null && ok "research-workflow.md dispatches[] carries round" || fail "research-workflow.md dispatches[] lacks round"
 grep -qF 'knobs.width' "$RW" 2>/dev/null && ok "research-workflow.md flow names knobs.width" || fail "research-workflow.md flow lacks knobs.width"
-grep -qF 'guides/thoroughness.md' "$RC" 2>/dev/null && ok "commands/research.md § Input mentions guides/thoroughness.md" || fail "commands/research.md never mentions guides/thoroughness.md"
-grep -qF 'max_agents' "$RC" 2>/dev/null && ok "commands/research.md passes max_agents" || fail "commands/research.md never mentions max_agents"
+sed -n '/^- Thoroughness flags/,/^- `--resume/p' "$RC" 2>/dev/null | grep -qF 'guides/thoroughness.md' \
+  && ok "commands/research.md thoroughness-flags bullet points at guides/thoroughness.md" || fail "commands/research.md thoroughness-flags bullet lacks guides/thoroughness.md"
+for tok in 'knobs:' 'max_agents'; do
+  sed -n '/^3\. \*\*Dispatch/,/^4\. /p' "$RC" 2>/dev/null | grep -qF -- "$tok" && ok "commands/research.md step 3 passes $tok" || fail "commands/research.md step 3 lacks $tok"
+done
+sed -n '/^3\. \*\*Dispatch/,/^4\. /p' "$RC" 2>/dev/null | grep -qF 'lead_agent_id: <id from the Agent result>' \
+  && ok "commands/research.md lead.txt keeps the lead_agent_id line" || fail "commands/research.md lead.txt lost the lead_agent_id line"
+sed -n '/^## Resume/,/^2\. /p' "$RC" 2>/dev/null | grep -qF 'max_agents:' \
+  && ok "commands/research.md Resume reads knobs:/max_agents: from lead.txt" || fail "commands/research.md Resume never reads max_agents: from lead.txt"
+grep -qF 'material Open row' "$RW" "$TH" 2>/dev/null && fail "cap and ceiling disagree: 'material Open row' still hedges PARTIAL" || ok "cap and ceiling both go PARTIAL unconditionally"
+grep -qF "that teammate's counter after this round" "$RL" 2>/dev/null && ok "research-lead.md says what round holds" || fail "research-lead.md does not say what round holds"
 for hint_tok in '--max-agents'; do
   grep -m1 '^argument-hint:' "$RC" 2>/dev/null | grep -qF -- "$hint_tok" && ok "commands/research.md argument-hint carries $hint_tok" || fail "commands/research.md argument-hint lacks $hint_tok"
 done

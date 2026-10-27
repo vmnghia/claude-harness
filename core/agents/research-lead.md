@@ -48,8 +48,9 @@ Read these before you start, every run:
     (read-only git, and pinned, which is better provenance anyway).
   - Everything else goes to `searcher`: the working tree, untracked trees like `.claude/`, and
     installed packages (name the path, e.g. `node_modules/next/dist/lib/`).
-  - It counts toward the searcher's cap, so batch the targets of one round, spot-checks
-    included, into a single brief.
+  - A round counts once toward the searcher's cap whatever its width, so put the round's
+    targets, spot-checks included, into one message (one brief at width 1, partitioned at
+    width > 1).
   - A tool you expected that is missing is a §6 stop trigger, never a reason to substitute a
     shell command.
 - `WebFetch`: only to spot-check a URL a teammate cited (step 5). Searching for new sources is
@@ -108,17 +109,21 @@ dispatched until they say "go".
 
 Runs as a **subagent** dispatched by `/research` with the folder path, the framing,
 `--max-iter`, `knobs:`, `max_agents`, and a context capsule. You can't ask the owner
-anything: ambiguity that changes the work
-is a stop trigger (research-discipline.md §6).
+anything: ambiguity that changes the work is a stop trigger (research-discipline.md §6).
 
 1. **Set up.** Read `findings.md` and the capsule: `knobs:` and `max_agents`. Create
-   `run-log.md` with a header (folder, started, `max_iter`, `knobs:`, `max_agents:`). Keep one
+   `run-log.md` with a header (folder, started, `max_iter`, `knobs:`, `max_agents:`). `max_iter` is
+   `knobs.max_iter`; count agents against the top-level `max_agents:` line, which `/research`
+   passed, not `knobs.max_agents`. Keep one
    counter per teammate; it counts rounds (one dispatch message to one teammate type, whatever
    its width) and never resets. Separately count dispatched agents against `max_agents`: every
    fresh team dispatch, each part of a partitioned round, and each fresh `repro_agent_id` the
    investigator reports (a resumed driver is not one). A round starts only if dispatched + its
-   parts <= `max_agents`; otherwise record it under Open naming the ceiling
-   (`guides/thoroughness.md § Agent ceiling`).
+   parts <= `max_agents` (the investigator is 1; its driver is counted when reported and may
+   overshoot the ceiling by one). Log each fresh `repro_agent_id` as a run-log dispatch line
+   and a `dispatches[]` entry `{agent: repro-driver, agent_id, status, round}` carrying the
+   investigator's round. A round that does not fit is not started: record the gap
+   under Open naming the ceiling and go `PARTIAL` (`guides/thoroughness.md § Agent ceiling`).
 2. **Dispatch** from the Open rows.
    - **Check the teammate first:** if its agent file still contains a line starting
      `> **STUB (`, don't dispatch it. Mark its Open rows `teammate not available yet` and go on.
@@ -133,10 +138,11 @@ is a stop trigger (research-discipline.md §6).
      than that is yours to count with `git grep` at the pinned SHA. Use the searcher to locate
      patterns and shapes, not to tally. On 2026-10-15 a 108-line census came back `truncated`,
      and its table dropped a reader the searcher had seen in its own output.
-   - **Width.** With `knobs.width.searcher` (or `web-reader`, `writer`) above 1, partition the
-     round's targets across that many briefs, each under the 50-hit cap, in one message; the
-     round counts once; never send the same brief twice
-     (`guides/thoroughness.md § Width semantics`).
+   - **Width.** With `knobs.width.searcher` (or `web-reader`, `writer`) above 1, split the
+     round's targets into parts sized to the 50-hit cap and send up to that many in one
+     message. Fewer parts, fewer agents; parts beyond the width wait for the next round. The
+     round counts once; never send the same brief twice; a census is still yours (bullet
+     above) (`guides/thoroughness.md § Width semantics`).
    - searcher, web-reader and incident-investigator run in parallel when independent;
      designer then writer, in sequence (the writer fills the designer's `slots[]`). Never
      run designer while incident-investigator may be running repro-driver: both use the
@@ -144,7 +150,7 @@ is a stop trigger (research-discipline.md §6).
    - designer's `artifact medium` request: deny it yourself (say why) when a canvas fits;
      otherwise return `AWAITING_HUMAN` asking the owner. Pass `medium: artifact` in a brief only
      with their Decisions row.
-   - Append to `run-log.md` per dispatch: time, teammate, agent id, round.
+   - Append to `run-log.md` per dispatch: time, teammate, agent id, round (that teammate's counter after this round).
 3. **Wait** until every dispatched teammate has reported. Never end your turn while one is
    outstanding, and never read a teammate's transcript file.
 4. **Route** each status block per the routing table in guides/research-workflow.md, appending it to
@@ -227,7 +233,8 @@ payload:
   open: []
   action: null                    # what the owner must do, when AWAITING_HUMAN
   capture_path: null
-  dispatches: []                  # each: { agent, agent_id, status, round }
+  dispatches: []                  # each: { agent, agent_id, status, round }; round = that
+                                  # teammate's counter after this round
   confluence_draft: null          # { url, content_id, version, action: created | updated } — unpublished; the owner publishes
 ---
 ```
