@@ -1216,6 +1216,15 @@ done
 U=$(grep -m1 '^argument-hint:' "$RC" 2>/dev/null | sed 's/^argument-hint: //; s/^"//; s/"$//')
 grep -qF -- "Usage: /research $U" "$RC" 2>/dev/null && ok "commands/research.md usage line matches the argument-hint" || fail "commands/research.md usage line differs from the argument-hint"
 
+# project.md carries the per-project override key (task 5); the parser reads it as is
+if [ "$H" = "$ROOT/core" ]; then grep -qF '"thoroughness"' "$ROOT/project-template/project.md" && ok "project-template/project.md documents the thoroughness key" || fail "project-template/project.md lacks the thoroughness key"; fi
+FX=$(mktemp -d); mkdir -p "$FX/.claude"
+printf '# Project facts\n\n```json harness\n{\n  "thoroughness": {"preset": "thorough", "width": {"searcher": 2}}\n}\n```\n' > "$FX/.claude/project.md"
+[ "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.js" thoroughness.width.searcher 2>/dev/null)" = "2" ] && ok "project-config reads thoroughness.width.searcher" || fail "project-config does not read thoroughness.width.searcher"
+[ "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.js" thoroughness.preset 2>/dev/null)" = "thorough" ] && ok "project-config reads thoroughness.preset" || fail "project-config does not read thoroughness.preset"
+[ -z "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.js" thoroughness.max_agents 2>/dev/null)" ] && ok "project-config prints nothing for an absent thoroughness.max_agents" || fail "project-config prints something for an absent thoroughness key"
+rm -rf "$FX"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do

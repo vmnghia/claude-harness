@@ -12,7 +12,8 @@ step and say so; they never guess a value.
   "dev_ports": [3000],
   "measurement_lock": ".claude/runs/MEASUREMENT-IN-PROGRESS.md",
   "heavy_commands": null,
-  "lint_on_request_only": false
+  "lint_on_request_only": false,
+  "thoroughness": null
 }
 ```
 
@@ -28,6 +29,9 @@ step and say so; they never guess a value.
   about while another session holds the lock. `null` = the default (builds, dev/start servers,
   installs, Lighthouse, harness-check). A list **replaces** the default, so repeat what you keep
   and add the project's own measurement scripts.
+- `thoroughness`: optional sizes for the teams, see `guides/thoroughness.md § Input`:
+  `{"preset": …, "width": {…}, "dry_rounds": …, "max_agents": …}`; any key may be absent; `null` =
+  the guide's `standard`.
 
 ## Owner
 
