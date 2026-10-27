@@ -5,7 +5,8 @@ load: always
 
 How to gather evidence and state conclusions in an investigation, a research brief or a review.
 **Required reading** for the research team (`research-lead`, `searcher`, `web-reader`, `designer`,
-`writer`, `incident-investigator`, `repro-driver`) and for `reviewer`. Planner reads it with every
+`writer`, `incident-investigator`, `repro-driver`, `research-critic`, `research-judge`) and for
+`reviewer`. Planner reads it with every
 other rule.
 
 > Condensed on 2026-10-14 from the owner's personal memories, which keep the full incident detail:

@@ -55,10 +55,10 @@ reads it when the trigger applies.
 
 | Guide | Consumers | Main session reads it when… |
 |---|---|---|
-| [research-workflow.md](./guides/research-workflow.md) | `/research`, research-lead, incident-investigator, repro-driver, searcher, designer, writer | running or resuming `/research`, or dispatching a research agent directly |
+| [research-workflow.md](./guides/research-workflow.md) | `/research`, research-lead, incident-investigator, repro-driver, searcher, designer, writer, research-critic, research-judge | running or resuming `/research`, or dispatching a research agent directly |
 | [ai-workflow.md](./guides/ai-workflow.md) | `/feature-flow`, `/planner`, planner, coder, tester, reviewer (§ Team protocol: the lead is the switchboard; peers message `main` only) | running the team flow or dispatching one of its agents |
 | [code-review.md](./guides/code-review.md) | reviewer | triaging review comments (CodeRabbit or human) |
-| [adversarial-review.md](./guides/adversarial-review.md) | `/adversarial-review`, adversarial-reviewer, review-judge, coder (findings-only mode), reviewer (§ Finding discipline) | running `/adversarial-review`, or dispatching a hunter or the judge directly |
+| [adversarial-review.md](./guides/adversarial-review.md) | `/adversarial-review`, adversarial-reviewer, review-judge, research-critic, research-judge, coder (findings-only mode), reviewer (§ Finding discipline) | running `/adversarial-review`, or dispatching a hunter or the judge directly |
 | [thoroughness.md](./guides/thoroughness.md) | `/adversarial-review`, `/feature-flow`, `/research`, research-lead, adversarial-reviewer (§ Angles) | parsing `--effort` / `--width` / `--dry` / `--max-agents`, or sizing a dispatch |
 | [agent-skills.md](./guides/agent-skills.md) | — | answering "can you do X / is there a skill for X", or recommending skills |
 
@@ -68,7 +68,7 @@ reads it when the trigger applies.
 |---|---|---|
 | Team flow | planner (standby), coder, tester, reviewer: persistent peers, questions through the lead, councils for decisions; the adversarial review as the gate | `/planner`, `/coder`, `/tester`, `/reviewer`, `/feature-flow` |
 | Adversarial review | adversarial-reviewer (×width per round, 2 by default), review-judge; coder in findings-only mode | `/adversarial-review` |
-| Research team | research-lead, searcher, web-reader, incident-investigator, repro-driver, designer, writer | `/research` |
+| Research team | research-lead, searcher, web-reader, incident-investigator, repro-driver, designer, writer, research-critic, research-judge (the critique) | `/research` |
 | Delegation | runner | dispatched directly ([delegation.md](./rules/delegation.md)) |
 
 `searcher`, `web-reader` and `runner` may be dispatched directly by the main session
@@ -92,7 +92,7 @@ don't retry, rephrase or work around it.
 | `session-context.sh` | SessionStart | prints branch, dirty files, newest spec+plan, test-runner presence, harness drift, this session's `session=` id, and any active lock |
 | `confluence-draft-gate.sh` | PreToolUse, **in `research-lead.md`'s frontmatter** | research-lead may write Confluence drafts only |
 | `quote-verify-gate.sh` | Stop, **in `web-reader.md`'s frontmatter** | every quote web-reader cites must be a verbatim substring of its page |
-| `review-bash-gate.sh` | PreToolUse(Bash) | for calls whose `agent_type` is `adversarial-reviewer` or `review-judge` only: allows read-only git and throwaway scripts under the session scratchpad, denies the rest, fails closed; every other caller passes |
+| `review-bash-gate.sh` | PreToolUse(Bash) | for calls whose `agent_type` is `adversarial-reviewer`, `review-judge`, `research-critic` or `research-judge` only: allows read-only git and throwaway scripts under the session scratchpad, denies the rest, fails closed; the two research types also get `git grep` and `verify-quote.sh`; every other caller passes |
 
 Hooks read project facts through `hooks/lib/project-config.js` and fall back to defaults when
 `project.md` is absent. They need `node` ≥18 on `PATH`. The quote gate parses YAML with the

@@ -1,17 +1,18 @@
 ---
 description: Research team — frame a question with the owner inline, then the research-lead subagent runs the team and writes findings.md
-argument-hint: "<question | FRONT-XXXX> [--max-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] | --resume <investigation-folder>"
+argument-hint: "<question | FRONT-XXXX> [--max-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] [--no-critique] | --resume <investigation-folder> | --critique <investigation-folder>"
 ---
 
 Contract: [`.claude/guides/research-workflow.md`](../guides/research-workflow.md). This command
 only selects where each phase runs; the procedure lives in
-[`.claude/agents/research-lead.md`](../agents/research-lead.md).
+[`.claude/agents/research-lead.md`](../agents/research-lead.md), and the critique's in
+`guides/research-workflow.md § Critique`.
 
 ## Input
 
 Raw arguments: `$ARGUMENTS`.
 
-- Empty → stop. Reply only: `Usage: /research <question | FRONT-XXXX> [--max-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] | --resume <investigation-folder>`. Create nothing.
+- Empty → stop. Reply only: `Usage: /research <question | FRONT-XXXX> [--max-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] [--no-critique] | --resume <investigation-folder> | --critique <investigation-folder>`. Create nothing.
 - Then, if `.claude/agents/research-lead.md` still contains the line starting `> **STUB (`,
   stop. Reply only: `research-lead is still a stub (procedure not written, work item #1); /research can't run yet.` Create nothing.
 - `--max-iter=N` → N must be a positive integer; otherwise warn
@@ -22,7 +23,17 @@ Raw arguments: `$ARGUMENTS`.
   `knobs:` and `max_agents` in the lead's capsule (New run step 3), and record them in
   `lead.txt`, so `--resume` reuses them. The lead counts against the top-level `max_agents`
   passed here, not `knobs.max_agents`.
+- `--no-critique` → skip the critique (`guides/research-workflow.md § Critique`, "When it
+  runs"). `--effort=quick` implies it, and so does a resolved `knobs.width.research-critic` of 0.
+  Otherwise the critique runs by default. Resolution reserves
+  `critic width × (K + 1) + critic width` of `max_agents` for the critique (`guides/thoroughness.md
+  § Agent ceiling`); the lead's capsule carries the remainder.
 - `--resume <folder>` → go to **Resume**.
+- `--critique <folder>` → the critique alone on an existing run, whatever its status
+  (`guides/research-workflow.md § Critique`, "Standalone"). It takes the thoroughness flags.
+  Stop, creating nothing, with `no findings.md` when `<folder>/findings.md` is missing, and with
+  `stopped` when its frontmatter `status` is `stopped`. It never edits `findings.md`. Go to
+  **Standalone critique**.
 
 ## New run
 
@@ -32,8 +43,11 @@ Raw arguments: `$ARGUMENTS`.
 2. **Frame.** Execute research-lead.md § "Framing" **inline in this session**. It creates
    `findings.md` from the template (frontmatter, question, dispatch plan).
 3. **Dispatch.** Agent tool, `subagent_type: "research-lead"`, with: the folder path, the
-   framing, `--max-iter`, `knobs:` and `max_agents` (the whole ceiling), and a context capsule
-   (`guides/ai-workflow.md` template). Then write `lead.txt` in the folder:
+   framing, `--max-iter`, `knobs:` and `max_agents` (the ceiling minus the critique's reserve,
+   `guides/thoroughness.md § Agent ceiling`), `critique: on | off` (`on` by default; `off` with
+   `--no-critique`, `--effort=quick`, or when `knobs.width.research-critic` would be 0; the lead
+   defers the Confluence draft when `on`), and a context capsule (`guides/ai-workflow.md`
+   template). Then write `lead.txt` in the folder:
    `lead_agent_id: <id from the Agent result>`, followed by the resolved `knobs:` and
    `max_agents:` lines for that agent id (Resume reuses them, never re-resolves). This is the
    main session's only file in the folder; `run-log.md` belongs to the lead.
@@ -41,9 +55,20 @@ Raw arguments: `$ARGUMENTS`.
    If the lead's task notification says `failed` on infrastructure (session limit / HTTP 429,
    API or network error), tell the owner what failed. Then say: "once it resets, run
    `/research --resume <folder>` (or say "resume" here)".
-5. **Report.** Show the owner the lead's final status block, then `findings.md`'s Answer and Next.
-   If `confluence_draft` is set, show its URL and say: "a draft, not published; review it in
-   Confluence and publish it yourself".
+5. **Critique.** Unless `critique: off`: run `guides/research-workflow.md § Critique` with this
+   session as orchestrator, once the lead has returned `ANSWERED` or `PARTIAL`. Critics by
+   `Agent` with `subagent_type: "research-critic"`, all of a round in one message
+   (`knobs.width.research-critic`, letters from `A`); the judge by `Agent` with
+   `subagent_type: "research-judge"`, one per disputed finding; the lead by `SendMessage` (load
+   its schema with ToolSearch `select:SendMessage` first) to the id in `lead.txt`.
+   Write `<folder>/critique.md` (the contract's case file; this session writes it, no agent
+   does). A failed send → the no-lead path (`rebuttal: unavailable`).
+6. **Report.** Show the owner the lead's final status block, then `findings.md`'s Answer and
+   Next, then the critique table and each `disputed` line (`disputed <id>: <question> — critic: …
+   — lead: …`) on its own line, how the critique ended (the contract's § Closing the run, step
+   9), and the Confluence draft line. With `rebuttal: unavailable`, add one line saying the
+   author never answered. If `confluence_draft` is set, show its URL and say: "a draft, not
+   published; review it in Confluence and publish it yourself".
    On `AWAITING_HUMAN`, show the `action` (and the `capture_path`, if set) and say: "do that,
    then run `/research --resume <folder>`".
 
@@ -65,4 +90,17 @@ Raw arguments: `$ARGUMENTS`.
    lead can't be resumed from this session. Do **not** start a fresh lead for an existing run.
    Offer the owner the two ways forward: abandon the run, or start a **new run** in a `-2` folder
    whose framing is seeded from the old run's `findings.md` and `results.txt`.
-4. Otherwise continue from **New run** step 4.
+4. Resume and the critique (`critique.md`'s state block; the contract's "Start, restart,
+   resume"):
+   - `settled: true` never starts or restarts a critique.
+   - `settled: false` restarts its current round with fresh critics.
+   - No `critique.md` and `critique: on`: it starts after the lead's next `ANSWERED` / `PARTIAL`.
+5. Otherwise continue from **New run** step 4.
+
+## Standalone critique
+
+`--critique <folder>` (`guides/research-workflow.md § Critique`, "Standalone"): resolve the
+knobs as for a new run, `dispatched` starts at 0, and run the critique with this session as
+orchestrator and the owner as the author (`rebuttal: unavailable`, no lead). Dispatch as in
+**New run** step 5. Write `<folder>/critique.md` (`critique-2.md` on collision); never edit
+`findings.md`. Report the critique table and each `disputed` line.

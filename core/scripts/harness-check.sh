@@ -1162,7 +1162,7 @@ grep -F -- '--effort=quick' "$TH" 2>/dev/null | grep -qF '"max_agents": 48' \
   && ok "thoroughness.md: --effort=quick beats project.md \"max_agents\": 48 (one line)" || fail "thoroughness.md lacks the --effort=quick vs \"max_agents\": 48 example on one line"
 # final-review fixes, commit 1: one home per contract
 grep -qF 'in the scratchpad' "$TH" 2>/dev/null && fail "thoroughness.md § Delta keeps snapshots 'in the scratchpad' (they live under .claude/runs/)" || ok "thoroughness.md § Delta: snapshots are not in the scratchpad"
-grep -qF 'passes the whole ceiling' "$TH" 2>/dev/null && ok "thoroughness.md: /research passes the whole ceiling to the lead" || fail "thoroughness.md lacks 'passes the whole ceiling'"
+grep -qF 'passes the whole ceiling' "$TH" 2>/dev/null && fail "thoroughness.md still says /research passes the whole ceiling to the lead" || ok "thoroughness.md: /research no longer passes the whole ceiling"
 grep -qF 'round_kind: probe' "$TH" 2>/dev/null && ok "thoroughness.md: a probe round is not a dry-check round" || fail "thoroughness.md lacks 'round_kind: probe' in § Dry rounds"
 grep -qF 'run so far' "$TH" 2>/dev/null && fail "thoroughness.md still defines dry_rounds as 'run so far'" || ok "thoroughness.md defines dry_rounds as dispatched"
 grep -qF 'by itself' "$TH" 2>/dev/null && fail "thoroughness.md still says the ceiling never changes the status 'by itself'" || ok "thoroughness.md: the ceiling's PARTIAL is unconditional"
@@ -1438,6 +1438,44 @@ for tok in '`open` whatever the token' 'a load-bearing claim moved to Open makes
     || fail "§ Critique › Closing the run never names $tok"
 done
 
+# task 5: the command runs the critique; the reserve; the index
+RC="$H/commands/research.md"; TH="$H/guides/thoroughness.md"; RW="$H/guides/research-workflow.md"
+AH=$(grep -m1 '^argument-hint:' "$RC" 2>/dev/null)
+for tok in '[--no-critique]' '--critique <investigation-folder>'; do
+  printf '%s\n' "$AH" | grep -qF -- "$tok" && ok "research.md argument-hint carries $tok" || fail "research.md argument-hint lacks $tok"
+done
+RIN=$(sed -n '/^## Input/,/^## New run/p' "$RC" 2>/dev/null)
+for tok in 'no findings.md' 'stopped' '--effort=quick' '--no-critique' '--critique <folder>'; do
+  printf '%s\n' "$RIN" | grep -qF -- "$tok" && ok "research.md § Input mentions $tok" || fail "research.md § Input never mentions $tok"
+done
+for tok in 'subagent_type: "research-critic"' 'subagent_type: "research-judge"' 'critique.md' \
+           'rebuttal: unavailable' 'disputed' 'restarts its current round' 'critique: on' \
+           'settled: true' 'settled: false' 'guides/research-workflow.md § Critique'; do
+  grep -qF -- "$tok" "$RC" 2>/dev/null && ok "research.md mentions $tok" || fail "research.md never mentions $tok"
+done
+RS3=$(sed -n '/^3\. \*\*Dispatch/,/^4\. /p' "$RC" 2>/dev/null)
+printf '%s\n' "$RS3" | grep -qF 'the whole ceiling' && fail "research.md step 3 still passes the whole ceiling" || ok "research.md step 3 no longer passes the whole ceiling"
+printf '%s\n' "$RS3" | grep -qF 'reserve' && ok "research.md step 3 names the reserve" || fail "research.md step 3 lacks 'reserve'"
+printf '%s\n' "$RS3" | grep -qF 'critique: on' && ok "research.md step 3 capsule carries critique: on | off" || fail "research.md step 3 capsule lacks critique: on"
+grep -qF 'Until the research critique' "$TH" 2>/dev/null && fail "thoroughness.md keeps the 'Until the research critique lands' clause" || ok "thoroughness.md dropped the 'Until the research critique lands' clause"
+grep -qF 'step 8.3' "$RW" 2>/dev/null && fail "research-workflow.md still says research-lead.md step 8.3" || ok "research-workflow.md cites the Confluence step as step 10.3"
+grep -qF 'research-lead.md step 10.3' "$RW" 2>/dev/null || fail "research-workflow.md lacks 'research-lead.md step 10.3'"
+CR=$(grep -F '| Research team |' "$H/CLAUDE.md" 2>/dev/null)
+for a in research-critic research-judge; do
+  printf '%s\n' "$CR" | grep -qF "$a" && ok "CLAUDE.md research-team row lists $a" || fail "CLAUDE.md research-team row lacks $a"
+  for g in adversarial-review research-workflow; do
+    grep -E "^\| \[$g\.md\]" "$H/CLAUDE.md" | grep -qF "$a" && ok "CLAUDE.md $g.md row lists $a" || fail "CLAUDE.md $g.md row lacks $a"
+  done
+  grep -F 'Required reading' "$H/rules/research-discipline.md" | grep -qF "$a" || sed -n '1,10p' "$H/rules/research-discipline.md" | tr '\n' ' ' | grep -qF "$a" \
+    && ok "research-discipline.md Required reading names $a" || fail "research-discipline.md Required reading lacks $a"
+done
+GR=$(grep -F '`review-bash-gate.sh`' "$H/CLAUDE.md" 2>/dev/null)
+for tok in research-critic research-judge adversarial-reviewer review-judge 'git grep' 'verify-quote.sh'; do
+  printf '%s\n' "$GR" | grep -qF -- "$tok" && ok "CLAUDE.md gate row names $tok" || fail "CLAUDE.md gate row lacks $tok"
+done
+U=$(grep -m1 '^argument-hint:' "$RC" 2>/dev/null | sed 's/^argument-hint: //; s/^"//; s/"$//')
+grep -qF -- "Usage: /research $U" "$RC" 2>/dev/null && ok "research.md usage line still matches the argument-hint" || fail "research.md usage line differs from the argument-hint"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
@@ -1453,7 +1491,7 @@ $PAIR_OK && ok "every -plan.md has a sibling -spec.md or -design.md"
 
 echo "== 7. research-discipline readers =="
 check "rules/research-discipline.md exists" test -f "$H/rules/research-discipline.md"
-for a in research-lead searcher web-reader designer writer incident-investigator repro-driver reviewer; do
+for a in research-lead searcher web-reader designer writer incident-investigator repro-driver reviewer research-critic research-judge; do
   check "$a.md references research-discipline.md" grep -q "rules/research-discipline.md" "$AG/$a.md"
 done
 

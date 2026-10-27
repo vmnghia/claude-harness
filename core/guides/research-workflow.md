@@ -72,7 +72,7 @@ the target (`Confluence: new draft under <parent URL>` or `draft update of <page
   while the lead runs; measured with a probe agent on 2026-10-15, where it fired inside the
   subagent and not in the parent session.
 - The page follows the target folder's convention: a template named in `project.md` § Tickets
-  and docs, else two sibling pages the lead matches (research-lead.md step 8.3).
+  and docs, else two sibling pages the lead matches (research-lead.md step 10.3).
 - **Labels need the owner.** `updateConfluenceContent` has no labels field, and adding labels is an
   `executeWrite` operation that no agent has. The lead lists the labels to add in Open.
 - `/research` shows the owner the draft link, and **they publish**. No other agent has a Confluence
