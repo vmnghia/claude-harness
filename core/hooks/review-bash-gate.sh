@@ -32,7 +32,8 @@
 # is checked) outside the scratchpad or /dev/null, `$(`, backticks, `${`, env assignments,
 # unquoted heredocs, a lone `&` (it runs the next command unchecked), process substitution
 # `<(…)` / `>(…)`, unbalanced quotes, `..` in a scratchpad path, and any segment of a compound
-# command that fails the above. Fail closed: unreadable input is denied. Every bypass closed on
+# command that fails the above, and an unquoted word-initial `#` (bash and the quote scan would
+# disagree inside a comment). Fail closed: unreadable input is denied. Every bypass closed on
 # 2026-10-26 was measured against this file first.
 # Exit 0 = allow. Exit 2 = deny; stderr is shown to the agent.
 
@@ -140,6 +141,10 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     //    command unchecked, and `<(…)` / `>(…)` run one inside an argument (measured 2026-10-26).
     var bare = unquoted(shell);
     if (bare === null) return "unbalanced quotes";
+    // Every check below reads `bare`, so it trusts unquoted() to end each quote where bash does. A
+    // comment is where they part (bash ignores a quote after `#`), so a word-initial unquoted `#` is
+    // denied rather than modelled.
+    if (/(^|[\s;&|()])#/.test(bare)) return "a shell comment (#): write the command without it";
     if (/[<>]\(/.test(bare)) return "process substitution <(…) / >(…)";
     if (/&/.test(bare.replace(/&&|[<>]&(\d+|-)|&>>?/g, ""))) return "a lone & (it would run the next command unchecked)";
     if (/\$["\x27]/.test(bare)) return "$\x27…\x27 / $\"…\" quoting (its escapes hide what the program receives)";
