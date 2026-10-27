@@ -1391,6 +1391,38 @@ for a in research-critic research-judge; do
     && ok "research-workflow.md model pins name $a (opus)" || fail "research-workflow.md model pins never name $a as opus"
 done
 
+# The lead as author (agents/research-lead.md): draft and return, answer the critique, finish
+# after "critique settled", then the Confluence draft, so a draft never carries a superseded claim.
+RL="$H/agents/research-lead.md"
+if [ -f "$RL" ]; then
+  prev=0; order_ok=1
+  for st in 'Draft and return' 'Rebuttal' 'Finish' 'Confluence draft'; do
+    n=$(grep -nF -- "**$st" "$RL" | head -1 | cut -d: -f1)
+    if [ -z "$n" ] || [ "$n" -le "$prev" ]; then order_ok=0; break; fi
+    prev=$n
+  done
+  steps='Draft and return → Rebuttal → Finish → Confluence draft'
+  [ "$order_ok" = 1 ] && ok "research-lead.md steps run $steps" \
+    || fail "research-lead.md lacks the steps $steps in order"
+  for tok in 'REBUTTAL' 'critique:' '## Critique' 'no findings' 'disputed' \
+             'answer the disputed questions' 'never `settled`' 'critique settled' \
+             'FIX' 'MAINTAIN' 'OUTSIDE_RUN'; do
+    grep -qF -- "$tok" "$RL" && ok "research-lead.md mentions $tok" \
+      || fail "research-lead.md never mentions $tok"
+  done
+  sed -n '/\*\*Rebuttal/,/\*\*Finish/p' "$RL" | grep -qw 'cap' \
+    && ok "research-lead.md Rebuttal step names the cap" \
+    || fail "research-lead.md Rebuttal step never names the cap"
+  sed -n '/\*\*Finish/,/\*\*Confluence/p' "$RL" | grep -qF 'Lessons' \
+    && ok "research-lead.md Finish step adds a Lessons row" \
+    || fail "research-lead.md Finish step never names Lessons"
+  sed -n '/\*\*Confluence draft/,/^## /p' "$RL" | grep -qE 'only after (step 9|the \*\*Finish)' \
+    && ok "research-lead.md Confluence step runs only after the finish" \
+    || fail "research-lead.md Confluence step lacks 'only after step 9'"
+else
+  fail "research-lead.md missing"
+fi
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
