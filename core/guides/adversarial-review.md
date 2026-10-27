@@ -438,6 +438,127 @@ summary: <one line>
 ---
 ```
 
+### Critique variants
+
+The research critique ([`research-workflow.md` § Critique](research-workflow.md#critique))
+reuses the shapes above and the Debate rules; this subsection lists only what differs, so each
+shape keeps one home. Everything else is the hunter shape with `agent: research-critic` and
+`role: critic-A | … | critic-H`: the hunt reply (minus `questions[]` and `probed`, since the
+critique has no delta and the author answers in the rebuttal), the cross-examination message
+and reply, the turn reply. In every shape, `outside_repo` reads `outside_run`, and evidence is
+of the research kind: `path:line@sha`, a `results.txt` marker, a URL with its
+`verify-quote.sh` result, a scratchpad script and its output.
+
+**Critique finding** (in place of § Finding: `target` and `claim` replace `file`, `line` and
+`issue`; `kind` is new):
+
+```yaml
+- id: A1
+  severity: blocker | major | minor | nit
+  target: "#3" | "Answer" | "Next" | "ledger: <fact>" | "Not shown: <entry>" | "Open: H2"
+  claim: <quoted verbatim from findings.md>
+  kind: unsupported | mislabelled | null-without-control | non-sequitur
+        | alternative | settled | scope
+  trigger: <what the evidence actually shows, or the alternative and what would separate it>
+  consequence: <what changes in Answer or Next if this stands>
+  suggestion: <one line>
+  provenance: read | inferred | executed
+  evidence: <path:line@sha, URL + quote check result, results.txt marker, or script + output>
+```
+
+Severity on the research scale, mapped onto § Severity on the harness scale so the ladder scope
+applies unchanged: `blocker`, the Answer or Next would change (a load-bearing claim its evidence
+does not support, or an untested alternative consistent with all the evidence); `major`, a
+load-bearing claim mislabelled or unpinned, a null without a control, a settled item re-raised
+as open, the framed question not answered; `minor`, the same defects on a claim nothing in
+Answer or Next rests on; `nit`, presentation. `executed` means the critic re-ran a cited check
+(`verify-quote.sh` on a quote, a scratchpad script over `results.txt`, `git grep -c` at the
+pinned SHA against a count in a table).
+
+**Critique capsule** (orchestrator → critic, the dispatch prompt). Role (`critic-A` …
+`critic-H`) and its angle; the investigation folder path; the resolved `knobs:` (the state
+block's line, verbatim); the framing's question verbatim; `project.md` § Stack verbatim (or
+`project.md missing` / `project.md still has TODOs`), for versioned docs; the session scratchpad
+path and the critic's own subfolder (`<scratchpad>/crit-r<N>-<role>/`); the critique case-file
+path (for reference only; the critic never reads or writes it); the never-read list: every
+investigation folder but this one, `.claude/runs/` (the case file included),
+`.claude/reports/` and any plugin store such as `.remember/`. Never the
+lead's transcript, never another critic's output, never the owner's conversation.
+
+**Critique message** (orchestrator → lead, `SendMessage` to the lead's id). "Critique of
+<folder>, round <N>. Findings: <every `AGREED` finding and every open `blocker`/`major`, in
+critique-finding shape, each followed by the cross-examination rulings on it verbatim>. For
+information, not for an answer: <the `CONTESTED` findings>. For each finding, reply `FIX`
+(applied to findings.md before you reply), `MAINTAIN` with `new_evidence`, or `OUTSIDE_RUN`
+with the one `question`, in a `REBUTTAL` block."
+
+**`REBUTTAL` block** (the lead's reply; also its reply to every later turn message):
+
+```yaml
+---
+agent: research-lead
+phase: rebuttal
+status: REBUTTAL
+payload:
+  responses:
+    - id: A1
+      response: FIX | MAINTAIN | OUTSIDE_RUN
+      new_evidence: <required with MAINTAIN; "none" with FIX>
+      peer_added_evidence: yes | no   # from the lead's second turn on a finding
+      edit: <FIX only: what changed in findings.md, one line ("#3 relabelled inferred")>
+      redispatch: <FIX only, optional: the teammate re-dispatched; counts toward its cap>
+      question: <OUTSIDE_RUN only: the one thing only the owner can settle>
+---
+```
+
+**Re-check message** (orchestrator → critic). "Re-check <ids>. The author's responses: <the
+lead's `REBUTTAL` entries on your findings, verbatim>. The current findings.md is <path>.
+For a `FIX`, `ACCEPT` if the edit closes the finding (it ends `FIXED`), else `CHALLENGE`
+naming the line that still fails. For a `MAINTAIN`, `ACCEPT` (it ends `WITHDRAWN`) or
+`CHALLENGE` with new evidence. For an `OUTSIDE_RUN`, `ACCEPT` with `outside_run: <question>`
+if you agree the answer is outside the run (it ends `ESCALATED`), else `CHALLENGE`.
+`new_evidence` is required; rate what you answer with `peer_added_evidence`." The re-check
+reply is a turn reply with `response: ACCEPT | CHALLENGE`. Every later critic turn uses this
+message.
+
+**Turn message** (orchestrator → lead, `SendMessage`). "Turn <k> on <ids>. The critic's last
+turn on each: <its turn entries, verbatim>. Reply with a `REBUTTAL` block for these ids; rate
+what you answer with `peer_added_evidence`."
+
+**Judge capsule** (orchestrator → `research-judge`, the dispatch prompt). The investigation
+folder path; one finding in critique-finding shape; the critic's and the lead's final turns on
+it verbatim; every script path and output either side produced on it; the scratchpad path and
+the judge's own subfolder; the never-read list of the critique capsule. Nothing about the
+orchestrator's reasoning or the rest of the debate.
+
+**Judge reply** (in place of § Judge reply):
+
+```yaml
+---
+agent: research-judge
+status: UPHELD | REFUTED | OUTSIDE_RUN
+finding: <id>
+payload:
+  severity: blocker | major | minor | nit
+  evidence: <the pins, markers, quotes or ledger rows re-opened; script path + output>
+  trigger: <UPHELD only: what the evidence actually shows>
+  refutation: <REFUTED only: the pin, marker or quote that supports the claim as written>
+  question: <OUTSIDE_RUN only: the one question the owner must answer>
+  summary: <one line>
+---
+```
+
+**Judge-ruling message** (orchestrator → the critic and the lead). "The judge ruled on <id>:
+<judge block verbatim>. One turn: accept, or challenge with new evidence." The critic replies
+with a turn reply (`ACCEPT | CHALLENGE`), the lead with a `REBUTTAL` block (`FIX` accepts an
+`UPHELD`); `research-workflow.md` § Critique step 5 has which response accepts which ruling.
+
+**"Critique settled" message** (orchestrator → lead, `SendMessage`). "Critique settled after
+<n> round(s), <ended dry | cut at its cap | cut at the agent ceiling | one round, K = 0>.
+Case file: <path>. Final table: <id, target, claim, end state, severity, evidence per finding,
+or `no findings`>. Disputed: <the state block's `disputed:` entries, each with the critic's and
+your final positions in one line each, or `none`>. Finish the write-up."
+
 ## Procedure
 
 The command executes this section. It holds no procedure of its own.

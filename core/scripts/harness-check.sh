@@ -1259,6 +1259,49 @@ printf '# Project facts\n\n```json harness\n{\n  "thoroughness": {"preset": "tho
 [ -z "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.js" thoroughness.max_agents 2>/dev/null)" ] && ok "project-config prints nothing for an absent thoroughness.max_agents" || fail "project-config prints something for an absent thoroughness key"
 rm -rf "$FX"
 
+echo "== 5i. Research critique (2026-10-27) =="
+# The critique's procedure lives in research-workflow.md § Critique; its message shapes in
+# adversarial-review.md § Message shapes › Critique variants; its record in the template.
+RW="$H/guides/research-workflow.md"; AR="$H/guides/adversarial-review.md"
+FT="$H/templates/findings-template.md"
+grep -qxF '## Critique' "$RW" 2>/dev/null && ok "research-workflow.md has '## Critique'" || fail "research-workflow.md lacks '## Critique'"
+RCQ=$(sed -n '/^## Critique$/,/^## Tool/p' "$RW" 2>/dev/null)
+for hd in '### The round' '### Rebuttal' '### Dry loop' '### Closing the run' '### Case file' '### Standalone'; do
+  printf '%s\n' "$RCQ" | grep -qxF -- "$hd" && ok "§ Critique has '$hd'" || fail "§ Critique lacks '$hd'"
+done
+for tok in 'FIXED' 'REBUTTAL' 'OUTSIDE_RUN' 'rebuttal: unavailable' 'critique.md' 'second main-session file' \
+           '--critique' '1 + 2K' '60 %' 'never edits' 'critic width × (K + 1)'; do
+  printf '%s\n' "$RCQ" | grep -qF -- "$tok" && ok "§ Critique mentions $tok" || fail "§ Critique never mentions $tok"
+done
+grep -qxF '### Critique variants' "$AR" 2>/dev/null && ok "adversarial-review.md has '### Critique variants'" || fail "adversarial-review.md lacks '### Critique variants'"
+ACV=$(sed -n '/^### Critique variants$/,/^## /p' "$AR" 2>/dev/null)
+for tok in 'research-critic' 'critic-H' 'null-without-control' 'response: FIX | MAINTAIN | OUTSIDE_RUN' 'new_evidence' 're-check'; do
+  printf '%s\n' "$ACV" | grep -qF -- "$tok" && ok "Critique variants mention $tok" || fail "Critique variants never mention $tok"
+done
+SB=$(sed -n '/^## Status blocks$/,/^## /p' "$RW" 2>/dev/null)
+row=$(printf '%s\n' "$SB" | grep -E '^\| research-critic \|')
+for tok in FINDINGS CLEAN RULINGS TURN; do
+  printf '%s\n' "$row" | grep -qF -- "\`$tok\`" && ok "status row research-critic carries $tok" || fail "status row research-critic lacks $tok"
+done
+row=$(printf '%s\n' "$SB" | grep -E '^\| research-judge \|')
+for tok in UPHELD REFUTED OUTSIDE_RUN; do
+  printf '%s\n' "$row" | grep -qF -- "\`$tok\`" && ok "status row research-judge carries $tok" || fail "status row research-judge lacks $tok"
+done
+row=$(printf '%s\n' "$SB" | grep -E '^\| research-lead \|')
+for tok in '`REBUTTAL`' '`critique`'; do
+  printf '%s\n' "$row" | grep -qF -- "$tok" && ok "status row research-lead carries $tok" || fail "status row research-lead lacks $tok"
+done
+SW=$(sed -n '/^\*\*Single writer\.\*\*/,/^$/p' "$RW" 2>/dev/null)
+for tok in 'critique.md' 'second main-session file'; do
+  printf '%s\n' "$SW" | grep -qF -- "$tok" && ok "single-writer paragraph names $tok" || fail "single-writer paragraph never names $tok"
+done
+sed -n '/^## Flow and roles$/,/^\*\*Single writer/p' "$RW" 2>/dev/null | grep -qE '^ ├─ [0-9]+\. Critique' \
+  && ok "flow diagram has a critique stage" || fail "flow diagram lacks a critique stage"
+grep -qxF '## Critique' "$FT" 2>/dev/null && ok "findings-template.md has '## Critique'" || fail "findings-template.md lacks '## Critique'"
+grep -qxF '## Claims checked' "$FT" 2>/dev/null && fail "findings-template.md still has '## Claims checked'" || ok "findings-template.md has no '## Claims checked'"
+sed -n '/^## Critique$/,/^## /p' "$FT" 2>/dev/null | grep -qF 'no findings' \
+  && ok "template § Critique says a run without findings writes 'no findings'" || fail "template § Critique lacks 'no findings'"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do

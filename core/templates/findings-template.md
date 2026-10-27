@@ -79,14 +79,17 @@ author: <agent name or session>
      (state UTC vs ICT), attribution rules for raw data, sampling. Descriptive only; advice for
      next time goes under Lessons. -->
 
-## Claims checked
+## Critique
 
-<!-- optional: kind "review". Every claim of the reviewed report you checked, including those
-     that hold, so a reader can see what was verified and not only what was wrong. -->
+<!-- every kind: the critique's checked-claim table, one row per finding, verdict = its end state;
+     a run without findings says `no findings`; names the critique case file
+     (critique.md; guides/research-workflow.md § Critique). -->
 
 | Claim (quoted) | Verdict | Severity | Evidence |
 |---|---|---|---|
-| <claim> | holds / wrong / unverifiable | blocker / major / minor | <where> |
+| <claim> | FIXED / AGREED / WITHDRAWN / REFUTED / ESCALATED / STALEMATE / CONTESTED | blocker / major / minor / nit | <where> |
+
+Case file: <investigation folder>/critique.md
 
 ## Lessons for future runs
 
