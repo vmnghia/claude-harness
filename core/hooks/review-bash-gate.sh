@@ -32,8 +32,10 @@
 #   - research-critic and research-judge only, two more (everything else here binds all four types):
 #     `git grep` (the read-only git rules apply; `-O`/`--open-files-in-pager` runs a program, so it
 #     is denied) and `bash .claude/scripts/verify-quote.sh <url> '<quote>'`: the script path is
-#     `.claude/scripts/verify-quote.sh`, optionally behind `./` or an absolute prefix, no `..`,
-#     then exactly two words (the URL and the quote, each one quoted or unquoted word)
+#     `.claude/scripts/verify-quote.sh`, optionally behind `./` or an absolute prefix, no `..`, and
+#     its realpath (from the call's cwd) must equal that of $CLAUDE_PROJECT_DIR/.claude/scripts/
+#     verify-quote.sh (a copy elsewhere, a symlink or a missing file is denied); then exactly two
+#     words (the URL and the quote, each one quoted word or an unquoted one without * ? [)
 # Denied: any other command word, any redirect (`&>`, `1&>`, `>|`, `<>` too; every unquoted `>`
 # is checked) outside the scratchpad or /dev/null, `$(`, backticks, `${`, env assignments,
 # unquoted heredocs, a lone `&` (it runs the next command unchecked), process substitution
@@ -65,12 +67,19 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     // earlier call is visible here.
     process.stdout.write(verdict(cmd, String(j.cwd || process.cwd()), who));
   });
-  var path = require("path");
+  var path = require("path"), fs = require("fs");
 
   var GATED = { "adversarial-reviewer":1, "review-judge":1, "research-critic":1, "research-judge":1 };
   // The one script research-critic/research-judge may run, with exactly a URL and a quote after it.
   var VQ_PATH = /^(\.\/|\/[^\s]+\/)?\.claude\/scripts\/verify-quote\.sh$/;
-  var VQ_WORD = "(?:\"[^\"\\\\]*\"|\x27[^\x27\\\\]*\x27|[^\\s\"\x27\\\\]+)";
+  var VQ_WORD = "(?:\"[^\"\\\\]*\"|\x27[^\x27\\\\]*\x27|[^\\s\"\x27\\\\*?\\[]+)";
+  // Where the one allowed script really is: the project root is CLAUDE_PROJECT_DIR (the hook has no git).
+  function vqPinned(word, cwd) {
+    try {
+      var root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      return fs.realpathSync(path.resolve(cwd, word)) === fs.realpathSync(path.join(root, ".claude/scripts/verify-quote.sh"));
+    } catch (e) { return false; }
+  }
   var VQ_CMD = new RegExp("^bash\\s+(\\S+)\\s+" + VQ_WORD + "\\s+" + VQ_WORD + "$");
   var SCRATCH = /^\/tmp\/claude-[^\/\s]+\/[^\s]*\/scratchpad\/[^\s]*$/;
   function isScratch(p) {
@@ -180,7 +189,7 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     if (cw === "timeout") { w = w.slice(1); while (w.length && /^-|^\d/.test(w[0])) w = w.slice(1); return checkSegment(w.join(" "), cwdScratch, cwd, who); }
     if (research && cw === "bash") {
       var vm = s.match(VQ_CMD);
-      if (!vm || !VQ_PATH.test(vm[1]) || /(^|\/)\.\.(\/|$)/.test(vm[1])) return "bash is allowed only as bash .claude/scripts/verify-quote.sh <url> \x27<quote>\x27 (no .. in the path, exactly two arguments)";
+      if (!vm || !VQ_PATH.test(vm[1]) || /(^|\/)\.\.(\/|$)/.test(vm[1]) || !vqPinned(vm[1], cwd)) return "bash is allowed only as bash .claude/scripts/verify-quote.sh <url> \x27<quote>\x27 (the project\x27s own script, no .. in the path, exactly two arguments, no unquoted glob)";
       return "allow";
     }
     if (cw === "git") {

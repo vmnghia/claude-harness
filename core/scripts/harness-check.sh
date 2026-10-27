@@ -335,10 +335,11 @@ RGATE="$H/hooks/review-bash-gate.sh"
 check "review-bash-gate.sh exists+executable" test -x "$RGATE"
 check "review-bash-gate.sh bash syntax" bash -n "$RGATE"
 RSCR=/tmp/claude-1000/-x/sess/scratchpad
+RPROJ=$(mktemp -d); mkdir -p "$RPROJ/.claude/scripts"; : > "$RPROJ/.claude/scripts/verify-quote.sh"
 rgate() { # rgate <expected-exit> <label> <command> [agent_type, default adversarial-reviewer; "-" = none] [cwd]
   local expect="$1" label="$2" got who="${4:-adversarial-reviewer}"
   WHO="$who" CWD="${5:-}" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j={tool_name:"Bash",tool_input:{command:d}};if(process.env.WHO!=="-")j.agent_type=process.env.WHO;if(process.env.CWD)j.cwd=process.env.CWD;process.stdout.write(JSON.stringify(j))})' <<<"$3" \
-    | "$RGATE" >/dev/null 2>&1; got=$?
+    | CLAUDE_PROJECT_DIR="$RPROJ" "$RGATE" >/dev/null 2>&1; got=$?
   if [ "$got" -eq "$expect" ]; then ok "[review-bash] $label → exit $got"; else fail "[review-bash] $label → exit $got (expected $expect)"; fi
 }
 rgate 0 "git diff base"            "git diff abc123 -- src"
@@ -445,18 +446,30 @@ rgate 0 "research-lead: curl passes" "curl https://example.com"         research
 # Research critique (2026-10-27): research-critic and research-judge are gated like the hunters, plus
 # `git grep` and `bash .claude/scripts/verify-quote.sh <url> '<quote>'` for those two types only.
 VQ='bash .claude/scripts/verify-quote.sh https://example.com/x "a quote"'
-rgate 0 "critic: verify-quote"          "$VQ"                                research-critic
-rgate 0 "judge: verify-quote"           "$VQ"                                research-judge
-rgate 0 "critic: verify-quote ./ path"  "bash ./.claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic
-rgate 0 "critic: verify-quote abs path" "bash /srv/repo/.claude/scripts/verify-quote.sh https://example.com/x 'a b'" research-critic
-rgate 2 "hunter: verify-quote denied"   "$VQ"                                adversarial-reviewer
-rgate 2 "review-judge: verify-quote denied" "$VQ"                            review-judge
-rgate 2 "critic: verify-quote with .."  'bash .claude/scripts/../scripts/verify-quote.sh https://example.com/x "a quote"' research-critic
-rgate 2 "critic: verify-quote three args" 'bash .claude/scripts/verify-quote.sh https://example.com/x "a quote" extra' research-critic
-rgate 2 "critic: verify-quote one arg"  'bash .claude/scripts/verify-quote.sh https://example.com/x' research-critic
-rgate 2 "critic: other script"          'bash .claude/scripts/harness-check.sh' research-critic
-rgate 2 "critic: verify-quote subst"    'bash .claude/scripts/verify-quote.sh https://example.com/x "$(id)"' research-critic
-rgate 2 "critic: verify-quote redirect" 'bash .claude/scripts/verify-quote.sh https://example.com/x "q" > notes.txt' research-critic
+rgate 0 "critic: verify-quote"          "$VQ"                                research-critic "$RPROJ"
+rgate 0 "judge: verify-quote"           "$VQ"                                research-judge "$RPROJ"
+rgate 0 "critic: verify-quote ./ path"  "bash ./.claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RPROJ"
+rgate 0 "critic: verify-quote abs path" "bash $RPROJ/.claude/scripts/verify-quote.sh https://example.com/x 'a b'" research-critic "$RPROJ"
+mkdir -p "$RPROJ/scratch/.claude/scripts"; cp "$RPROJ/.claude/scripts/verify-quote.sh" "$RPROJ/scratch/.claude/scripts/"
+ln -s "$RPROJ/scratch/.claude/scripts/verify-quote.sh" "$RPROJ/link-vq.sh"
+rgate 2 "critic: verify-quote from a copy elsewhere" "bash $RPROJ/scratch/.claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RPROJ"
+rgate 2 "critic: verify-quote from scratchpad copy" 'bash /tmp/claude-x/s/scratchpad/.claude/scripts/verify-quote.sh https://example.com/x "q"' research-critic "$RPROJ"
+rgate 2 "critic: verify-quote missing script" "$VQ" research-critic /srv/nowhere
+rgate 2 "hunter: verify-quote denied"   "$VQ"                                adversarial-reviewer "$RPROJ"
+rgate 2 "review-judge: verify-quote denied" "$VQ"                            review-judge "$RPROJ"
+rgate 2 "critic: verify-quote with .."  'bash .claude/scripts/../scripts/verify-quote.sh https://example.com/x "a quote"' research-critic "$RPROJ"
+rgate 2 "critic: verify-quote three args" 'bash .claude/scripts/verify-quote.sh https://example.com/x "a quote" extra' research-critic "$RPROJ"
+rgate 2 "critic: verify-quote one arg"  'bash .claude/scripts/verify-quote.sh https://example.com/x' research-critic "$RPROJ"
+rgate 2 "critic: verify-quote abs path with .." 'bash /srv/../.claude/scripts/verify-quote.sh https://example.com/x "q"' research-critic "$RPROJ"
+rgate 2 "critic: verify-quote glob word" 'bash .claude/scripts/verify-quote.sh https://example.com/x *' research-critic "$RPROJ"
+rgate 2 "critic: verify-quote glob url" 'bash .claude/scripts/verify-quote.sh https://example.com/x? "q"' research-critic "$RPROJ"
+rgate 0 "critic: verify-quote quoted ? url" "bash .claude/scripts/verify-quote.sh 'https://example.com/x?a=1' 'q*'" research-critic "$RPROJ"
+rgate 2 "critic: git grep --open-files-in-pager=" "git grep --open-files-in-pager=sh foo abc123" research-critic
+rgate 2 "critic: git grep --open (prefix)" "git grep --open=sh foo abc123" research-critic
+rgate 2 "critic: git grep -nO (cluster)" "git grep -nO sh foo abc123" research-critic
+rgate 2 "critic: other script"          'bash .claude/scripts/harness-check.sh' research-critic "$RPROJ"
+rgate 2 "critic: verify-quote subst"    'bash .claude/scripts/verify-quote.sh https://example.com/x "$(id)"' research-critic "$RPROJ"
+rgate 2 "critic: verify-quote redirect" 'bash .claude/scripts/verify-quote.sh https://example.com/x "q" > notes.txt' research-critic "$RPROJ"
 rgate 0 "critic: git show pinned"       'git show abc123:src/x.ts'           research-critic
 rgate 2 "critic: git add"               'git add -A'                         research-critic
 rgate 0 "critic: git grep pinned"       "git grep -c 'foo' abc123 -- src"    research-critic
@@ -475,6 +488,7 @@ for a in adversarial-reviewer review-judge; do
 done
 grep -qF 'review-bash-gate.sh' "$H/CLAUDE.md" && ok "CLAUDE.md Hooks table names review-bash-gate.sh" || fail "CLAUDE.md Hooks table lacks review-bash-gate.sh"
 
+rm -rf "$RPROJ"
 echo "== 3. Config validity =="
 check ".claude/settings.json parses" node -e "JSON.parse(require('fs').readFileSync('$H/settings.json','utf8'))"
 if [ -f "$ROOT/.mcp.json" ]; then
