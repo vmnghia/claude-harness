@@ -1098,11 +1098,18 @@ for f in "$H"/agents/*.md; do
   { printf '%s\n' "$w" | grep -qxE '[1-8] [1-8] [1-8]' || { [ -n "$r" ] && [ "$r" != "—" ]; }; } \
     && ok "knob row $a is a width (1–8) or carries a reason" || fail "knob row $a is neither a width 1–8 nor a reason"
 done
-for a in research-lead incident-investigator repro-driver designer coder tester reviewer planner; do
-  r=$(printf '%s\n' "$KT" | grep -E '^\| `'"$a"'`' | trim_cell 6)
+for a in research-lead incident-investigator repro-driver designer coder tester reviewer planner review-judge research-judge runner; do
+  row=$(printf '%s\n' "$KT" | grep -E '^\| `'"$a"'`'); r=$(printf '%s\n' "$row" | trim_cell 6)
   [ -n "$r" ] && [ "$r" != "—" ] && ok "singleton $a carries its reason" || fail "singleton $a has no reason in the knob table"
+  ws=0; for c in 3 4 5; do printf '%s\n' "$row" | trim_cell $c | grep -qxE '1|n/a|one per dispute' && ws=$((ws + 1)); done
+  [ "$ws" = 3 ] && ok "singleton $a never widens (1, n/a or one per dispute)" || fail "singleton $a has a width other than 1 / n/a / one per dispute"
 done
-for tok in quick standard thorough exhaustive --effort --width --dry --max-agents 8 warn cycle hunter-H time-and-config claims-and-consumers probed "tried:" "agent ceiling" "counts once toward" "git ls-files --others" "--effort=quick" '"max_agents": 48' '"width": {"searcher": 2}'; do
+for pr in '| hunters / critics per round | 2 | 2 | 3 | 5 |' '| `--max-agents` default | 12 | 24 | 48 | 64 |'; do
+  grep -qxF -- "$pr" "$TH" 2>/dev/null && ok "thoroughness.md preset row: $pr" || fail "thoroughness.md preset row missing or wrong: $pr"
+done
+grep -F -- '--effort=quick' "$TH" 2>/dev/null | grep -qF '"max_agents": 48' \
+  && ok "thoroughness.md: --effort=quick beats project.md \"max_agents\": 48 (one line)" || fail "thoroughness.md lacks the --effort=quick vs \"max_agents\": 48 example on one line"
+for tok in quick standard thorough exhaustive --effort --width --dry --max-agents 8 warn cycle hunter-H time-and-config claims-and-consumers probed "tried:" "reason: agent ceiling" "cut at its cap" "counts once toward" "git ls-files --others" "--effort=quick" '"max_agents": 48' '"width": {"searcher": 2}'; do
   grep -qF -- "$tok" "$TH" 2>/dev/null && ok "thoroughness.md mentions $tok" || fail "thoroughness.md never mentions $tok"
 done
 grep -qF 'A round of parallel briefs to one teammate type counts once toward `--max-iter`; the width is the number of agents in that round.' "$TH" 2>/dev/null \

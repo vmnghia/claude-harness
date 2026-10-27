@@ -113,15 +113,31 @@ thing every orchestrator and the lead already track in their run logs. A count i
 - **Counts:** every fresh `Agent` dispatch of the run: hunters, critics, judges, gatherers,
   teammates. A fresh dispatch that replaces a failed resume counts.
 - **Free:** a resume through `SendMessage`.
-- **Before a round:** a round starts only when its whole width fits under the ceiling; otherwise
-  the run ends at the ceiling.
-- **Reaching it** ends the run through the existing limit statuses: `REVIEW_LIMIT_REACHED` in
-  the adversarial review; the lead goes `PARTIAL` with an Open row naming the ceiling. There is
-  no new status token.
+- **Fits:** a dispatch of `n` agents fits when `dispatched + n ≤ max_agents`, where
+  `dispatched` is the run's count so far. For a round of hunters or critics `n` is the whole
+  width; for gatherers it is the parts the round will actually dispatch (gatherer width is a
+  maximum, § Width semantics); a judge or a teammate is 1. A round that does not fit is not
+  started: nothing is dispatched partially.
 - **Mid-round:** the orchestrator finishes the round with what resumes allow (a `SendMessage` is
   free). A judge it can no longer dispatch leaves its finding `STALEMATE` with
   `reason: agent ceiling`. Then the exit check runs. It never stops with findings in mid-debate.
 - **The recap says so:** a run ended by the ceiling reads "cut at the agent ceiling".
+
+**Status at the ceiling: the last exit check decides.** There is no new status token. In
+`/adversarial-review` and the `/feature-flow` gate, the last exit check's result stands
+(`APPROVED`, `NEEDS_OWNER`, `REVIEWED`), except where it calls for another round that does not
+fit:
+
+- the next round would verify a fix (the exit check found an `AGREED` `blocker`/`major`,
+  including one left by a round the ceiling stopped mid-way) → `REVIEW_LIMIT_REACHED`. The
+  orchestrator does not dispatch a fix it cannot verify: Coder goes out only when Coder and the
+  next round both fit;
+- the next round would be a dry-check round (the exit check was clean) → `APPROVED`, and the
+  recap says the **dry loop was cut at the agent ceiling**, as it does at the `2K` cap.
+
+In `/research` the ceiling never changes the lead's status by itself. A round that does not fit
+is not started; the lead records the gap under Open, naming the ceiling, and goes `PARTIAL` only
+if an Open row that mattered is left unresolved, exactly as it does at a teammate's cap.
 
 The 48 of `thorough` is the session's own Workflow guideline ("keep workflows under 50 agents").
 At `exhaustive` the arithmetic runs the other way: `K = 3` allows 6 dry-check rounds, so a
@@ -196,7 +212,8 @@ uses the same sizes and never re-resolves. Shape (all non-singleton widths, alwa
 knobs: {effort: standard, width: {adversarial-reviewer: 2, searcher: 1, web-reader: 1, writer: 1, research-critic: 2}, dry: 0, max_iter: 3, max_agents: 24}
 ```
 
-`effort` is the preset resolution started from; `dry` is `K`; `max_iter` is the cap of the
+`effort` is the preset resolution started from; `dry` is `K`, the setting (§ Dry rounds tells
+it apart from the state block's `dry_rounds` count); `max_iter` is the cap of the
 command's own loop: `review_iter` in `/adversarial-review`, `gate_iter` in `/feature-flow`, the
 per-teammate round cap in `/research`.
 
@@ -230,11 +247,18 @@ Fix-introduced code is a fresh diff, at every width. Code a fix added has never 
 
 **The delta.** After a fix, the next round's hunt capsule carries `delta:`: Coder's
 `changed_files` plus the hunks that differ between the previous round's tree and this one. The
-orchestrator keeps the previous round's `git diff <base>` and its untracked list in the
-scratchpad and diffs the two. Like the tree hash (`adversarial-review.md` § Case file), the delta
-is computed over `git diff <base>` **and** `git ls-files --others --exclude-standard`: a file that
-is new and untracked since the previous round is a delta file whole. A round that follows no fix
-(the first round, a dry-check round) carries `delta: none`.
+orchestrator keeps, in the scratchpad, the previous round's `git diff <base>` and, for every
+path from `git ls-files --others --exclude-standard`, the path and its `sha256sum`: the inputs
+of the tree hash (`adversarial-review.md` § Case file), kept per file instead of hashed
+together. The delta is:
+
+- Coder's `changed_files`;
+- every file whose hunks differ between the previous round's `git diff <base>` and this one;
+- every untracked file that is new since the previous round or whose `sha256sum` changed, as a
+  whole-file delta. An edit to an existing untracked file reaches the delta this way, without
+  relying on Coder's self-reported `changed_files`.
+
+A round that follows no fix (the first round, a dry-check round) carries `delta: none`.
 
 **Hunters cover every playbook bucket on the delta first**, then the rest of the diff.
 
@@ -248,9 +272,13 @@ probed:
 
 - A hunt reply with a delta and no `probed[]` entry for a delta file it has no finding on is
   incomplete. The orchestrator sends it back once, before cross-examination: "Name what you
-  probed in <file>." A second reply without it goes on, and the synthesis names the unprobed
-  file.
-- `CLEAN` on a round with a delta requires a `probed[]` entry for every delta file.
+  probed in <file>." A reply still missing entries after the send-back goes on to
+  cross-examination, and its missing delta files count as uncovered by that hunter.
+- A `CLEAN` hunt reply in a round with a delta requires a `probed[]` entry for every delta
+  file. A `CLEAN` reply still missing entries after the send-back does not count as `CLEAN` for
+  the exit check: it is recorded as `CLEAN (unprobed: <files>)` and treated as a hunt that found
+  nothing on the rest of the diff, with the delta files uncovered. The recap lists every
+  uncovered delta file.
 
 This is `research-discipline.md` § 3 applied to a review: a null needs proof the probe ran.
 
@@ -258,6 +286,9 @@ This is `research-discipline.md` § 3 applied to a review: a null needs proof th
 
 `K` is the number of consecutive **dry rounds** that end a loop early. A round is dry when it
 adds no **new finding**.
+
+Three names, two things: `--dry`, `project.md` `"dry_rounds"` and `knobs.dry` are `K`, the
+setting; the state block's `dry_rounds` is the count of dry-check rounds run so far.
 
 A **new finding** is one that is not a duplicate of any earlier round's finding, at **any**
 severity, by the breaker's sameness rule (same `file`, lines within 5, 60 % of `issue` words
