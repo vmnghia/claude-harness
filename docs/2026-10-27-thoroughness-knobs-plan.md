@@ -358,8 +358,13 @@ critique will change again, the task says so.
 - [ ] **Step 1: Regression, no flags.** `/adversarial-review --no-fix` on the fixture diff the
   2026-10-22 design was verified with (the design's § Verified names it). Expected: two
   hunters, the case file's state block carries `knobs:` with `standard` values and
-  `dry_rounds: 0`, every other key as before, final block `REVIEWED` or `APPROVED` as before.
-  Record the state block in § Verified.
+  `dry_rounds: 0`, plus the new keys `knobs`, `dry_rounds`, `dry_streak`, `dispatched`,
+  `round_kind`, `round`; every pre-existing key as before, final block `REVIEWED` or `APPROVED`
+  as before. Record the state block in § Verified.
+- [ ] **Step 1b: Fresh-session resume.** Start `/adversarial-review --effort=thorough --no-fix`
+  on the fixture, stop it after round 1's synthesis, `--resume` it in a fresh `claude -p`: the
+  restarted round's capsule carries the recorded `knobs` width and a `delta:` recomputed from
+  `r<N-1>`/`r<N>`.
 - [ ] **Step 2: Delta and probes.** A fixture diff with a planted defect inside a hunk that a
   "fix" adds (e.g. a time window that counts from the first failure with no minimum count),
   run with fixes on and `--max-iter=1`. Expected: round 2's capsule carries `delta:`, every

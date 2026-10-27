@@ -1124,6 +1124,25 @@ sed -n '/^## Case file/,/^## Tool/p' "$AR" 2>/dev/null | grep -qF 'round:' \
   && ok "adversarial-review.md state block has round:" || fail "adversarial-review.md state block lacks round:"
 grep -qF 'unless your capsule names another angle' "$HUNTER" 2>/dev/null \
   && ok "adversarial-reviewer: a capsule may name another angle (dry rounds rotate)" || fail "adversarial-reviewer: angle assignment ignores the dry-round rotation"
+# final-review fixes, commit 2: pin the remaining preset rows; knob table agrees with presets
+for pr in '| `K` (dry rounds) | 0 | 0 | 1 | 3 |' '| gatherer width (searcher, web-reader, writer) | 1 | 1 | 2 | 3 |' \
+          '| adversarial cap: `--max-iter` in `/adversarial-review` | 1 | 3 | 5 | 8 |' \
+          '| adversarial cap: `--max-gate-iter` in `/feature-flow` | 1 | 2 | 3 | 5 |'; do
+  grep -qxF -- "$pr" "$TH" 2>/dev/null && ok "thoroughness.md preset row: $pr" || fail "thoroughness.md preset row missing or wrong: $pr"
+done
+PT=$(sed -n '/^## Presets$/,/^## Agent ceiling$/p' "$TH" 2>/dev/null)
+cells3() { awk -F'|' -v s="$1" '{for(i=s;i<s+3;i++){v=$i; gsub(/^[ \t]+|[ \t]+$/,"",v); printf "%s%s", v, (i<s+2?" ":"\n")}; exit}'; }  # first of 3 columns
+hrow=$(printf '%s\n' "$PT" | grep -F '| hunters / critics per round |' | cells3 4)
+grow=$(printf '%s\n' "$PT" | grep -F '| gatherer width (searcher, web-reader, writer) |' | cells3 4)
+for pair in "adversarial-reviewer:$hrow" "searcher:$grow" "web-reader:$grow" "writer:$grow"; do
+  a=${pair%%:*}; want=${pair#*:}
+  got=$(printf '%s\n' "$KT" | grep -E '^\| `'"$a"'`' | cells3 3)
+  [ -n "$want" ] && [ "$got" = "$want" ] && ok "knob table $a ($got) matches the preset table" || fail "knob table $a ('$got') differs from the preset table ('$want')"
+done
+sed -n '/^### Roster and run document/,/^### Message shapes/p' "$WF" 2>/dev/null | grep -qF 'knobs:' \
+  && ok "ai-workflow.md run-document state block has knobs:" || fail "ai-workflow.md run-document state block lacks knobs:"
+grep -qF 'never re-resolved' "$WF" 2>/dev/null && ok "ai-workflow.md § Resume keeps knobs, never re-resolved" || fail "ai-workflow.md lacks 'never re-resolved'"
+grep -qF 'floored to that width with a warning' "$TH" 2>/dev/null && ok "thoroughness.md § Input floors --max-agents to the width" || fail "thoroughness.md § Input lacks the --max-agents floor"
 for tok in quick standard thorough exhaustive --effort --width --dry --max-agents 8 warn cycle hunter-H time-and-config claims-and-consumers probed "tried:" "reason: agent ceiling" "cut at its cap" "counts once toward" "git ls-files --others" "--effort=quick" '"max_agents": 48' '"width": {"searcher": 2}'; do
   grep -qF -- "$tok" "$TH" 2>/dev/null && ok "thoroughness.md mentions $tok" || fail "thoroughness.md never mentions $tok"
 done

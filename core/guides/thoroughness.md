@@ -167,6 +167,9 @@ Each command's § Input points here instead of repeating this.
 - `--dry=K`: dry rounds, a non-negative integer.
 - `--max-agents=N`: the agent ceiling, a positive integer.
 
+`--max-agents` below the resolved hunter/critic width is floored to that width with a warning, so
+round 1 always fits.
+
 The adversarial cap flags (`--max-iter` in `/adversarial-review`, `--max-gate-iter` in
 `/feature-flow`) stay in each command's § Input; they are single values in the sense below.
 

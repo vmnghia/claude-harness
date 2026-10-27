@@ -162,6 +162,7 @@ state:
   test_iter: 0
   review_iter: 0
   gate_iter: 0
+  knobs: {…}   # resolved once per guides/thoroughness.md § Input; never re-resolved
   roster: {lead: main, planner: <agent id or inline>, coder: <id>, tester: <id>, reviewer: <id>}
   decisions:
     - {id: D1, by: lead | council | owner | assumed, question_id: QC1, question: <one line>, decision: <one line>, applies_to: [coder, tester, reviewer]}
@@ -333,9 +334,9 @@ position wakes a context.
 Re-dispatch Planner (subagent), Coder, Tester and Reviewer fresh, each with the spec, the plan,
 the full `decisions` list and the standby brief; write the new roster; restart the current
 `step` from its beginning (a half-done coding step runs again on the tree as it is, with Coder
-told what the previous Coder reported). `test_iter`, `review_iter` and `gate_iter` are kept. A
-`QUESTION` or `OBJECTION` that was open is re-raised by the re-dispatched peer if it still
-applies. The gate resumes per [adversarial-review.md](./adversarial-review.md) § Resume.
+told what the previous Coder reported). `test_iter`, `review_iter` and `gate_iter` are kept.
+`knobs` is kept, never re-resolved; the gate's case file copies it. A `QUESTION` or `OBJECTION` that was open is re-raised by the
+re-dispatched peer if it still applies. The gate resumes per [adversarial-review.md](./adversarial-review.md) § Resume.
 
 ## Procedure
 
