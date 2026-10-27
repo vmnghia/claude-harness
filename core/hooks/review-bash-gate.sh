@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# PreToolUse(Bash) hook — the Bash boundary for adversarial-reviewer and review-judge.
+# PreToolUse(Bash) hook — the Bash boundary for adversarial-reviewer, review-judge, research-critic
+# and research-judge.
 # Registered in settings.json for every Bash call; it reads the call's `agent_type` and allows
 # everything from any other caller (the main session, Coder, the research team). A hook in an
 # agent file's own frontmatter never fired for PreToolUse here (measured 2026-10-22, Claude Code
@@ -28,6 +29,11 @@
 #   `$"…"` (escapes: `$'\x2dexec'` is -exec), brace expansion (`{-i,x}` is two words), and a glob
 #   in the arguments of sed/sort/rg/find/awk/xargs/uniq (a file named `--pre=sh` turned
 #   `rg x *` into running sh on every file: measured 2026-10-26).
+#   - research-critic and research-judge only, two more (everything else here binds all four types):
+#     `git grep` (the read-only git rules apply; `-O`/`--open-files-in-pager` runs a program, so it
+#     is denied) and `bash .claude/scripts/verify-quote.sh <url> '<quote>'`: the script path is
+#     `.claude/scripts/verify-quote.sh`, optionally behind `./` or an absolute prefix, no `..`,
+#     then exactly two words (the URL and the quote, each one quoted or unquoted word)
 # Denied: any other command word, any redirect (`&>`, `1&>`, `>|`, `<>` too; every unquoted `>`
 # is checked) outside the scratchpad or /dev/null, `$(`, backticks, `${`, env assignments,
 # unquoted heredocs, a lone `&` (it runs the next command unchecked), process substitution
@@ -40,7 +46,7 @@
 INPUT=$(cat)
 
 deny() {
-  echo "review-bash-gate: DENIED — $1. Hunters and the judge may run only read-only git and throwaway scripts under the session scratchpad (policy: .claude/guides/adversarial-review.md § Tool boundaries; this is policy, not an error — do not retry the same command)" >&2
+  echo "review-bash-gate: DENIED — $1. Hunters, the review judge and the research critic/judge may run only read-only git and throwaway scripts under the session scratchpad; the research critic/judge may also run git grep and verify-quote.sh (policy: .claude/guides/adversarial-review.md § Tool boundaries; this is policy, not an error — do not retry the same command)" >&2
   exit 2
 }
 
@@ -52,15 +58,20 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     try { j = JSON.parse(d); } catch (e) { return; }
     if (String(j.tool_name || "") !== "Bash") return process.stdout.write("allow");
     var who = String(j.agent_type || "");
-    if (who !== "adversarial-reviewer" && who !== "review-judge") return process.stdout.write("allow");
+    if (!GATED[who]) return process.stdout.write("allow");
     var cmd = String((j.tool_input || {}).command || "");
     if (!cmd.trim()) return process.stdout.write("empty command");
     // `cwd` follows the persisted directory of the Bash tool (measured 2026-10-26), so a `cd` from an
     // earlier call is visible here.
-    process.stdout.write(verdict(cmd, String(j.cwd || process.cwd())));
+    process.stdout.write(verdict(cmd, String(j.cwd || process.cwd()), who));
   });
   var path = require("path");
 
+  var GATED = { "adversarial-reviewer":1, "review-judge":1, "research-critic":1, "research-judge":1 };
+  // The one script research-critic/research-judge may run, with exactly a URL and a quote after it.
+  var VQ_PATH = /^(\.\/|\/[^\s]+\/)?\.claude\/scripts\/verify-quote\.sh$/;
+  var VQ_WORD = "(?:\"[^\"\\\\]*\"|\x27[^\x27\\\\]*\x27|[^\\s\"\x27\\\\]+)";
+  var VQ_CMD = new RegExp("^bash\\s+(\\S+)\\s+" + VQ_WORD + "\\s+" + VQ_WORD + "$");
   var SCRATCH = /^\/tmp\/claude-[^\/\s]+\/[^\s]*\/scratchpad\/[^\s]*$/;
   function isScratch(p) {
     p = p.replace(/^["\x27]|["\x27]$/g, "");
@@ -125,7 +136,7 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     return "";
   }
 
-  function verdict(cmd, cwd) {
+  function verdict(cmd, cwd, who) {
     // 1. Split off a heredoc body: it is script content, scanned for nothing; the delimiter must be quoted.
     var shell = cmd, m = cmd.match(/<<-?\s*(["\x27]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n/);
     if (m) {
@@ -155,20 +166,28 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     var segs = shell.split(/\n|&&|\|\||;|\|(?!\|)/), cwdScratch = false;
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i].trim(); if (!s) continue;
-      var r = checkSegment(s, cwdScratch, cwd); if (r !== "allow") return r;
+      var r = checkSegment(s, cwdScratch, cwd, who); if (r !== "allow") return r;
       var cdm = s.match(/^cd\s+(\S+)$/); if (cdm && isScratch(cdm[1])) cwdScratch = true;
     }
     return "allow";
   }
 
-  function checkSegment(s, cwdScratch, cwd) {
+  function checkSegment(s, cwdScratch, cwd, who) {
+    var research = who === "research-critic" || who === "research-judge";
     var w = s.split(/\s+/), cw = w[0];
     // The arguments as the program receives them: quotes and backslashes removed (`\x27-i\x27` is -i).
     var args = s.replace(/["\x27\\]/g, "").split(/\s+/).slice(1), hit;
-    if (cw === "timeout") { w = w.slice(1); while (w.length && /^-|^\d/.test(w[0])) w = w.slice(1); return checkSegment(w.join(" "), cwdScratch, cwd); }
+    if (cw === "timeout") { w = w.slice(1); while (w.length && /^-|^\d/.test(w[0])) w = w.slice(1); return checkSegment(w.join(" "), cwdScratch, cwd, who); }
+    if (research && cw === "bash") {
+      var vm = s.match(VQ_CMD);
+      if (!vm || !VQ_PATH.test(vm[1]) || /(^|\/)\.\.(\/|$)/.test(vm[1])) return "bash is allowed only as bash .claude/scripts/verify-quote.sh <url> \x27<quote>\x27 (no .. in the path, exactly two arguments)";
+      return "allow";
+    }
     if (cw === "git") {
       var gm = s.match(GIT_C), sub = gm ? s.slice(gm[0].length) : "";
-      if (!GIT_RO.test(sub)) return "git \x27" + (sub.split(/\s+/)[0] || "") + "\x27 is not read-only";
+      var grepOk = research && /^grep(\s|$)/.test(sub);
+      if (grepOk && (some(args, /^-[a-zA-Z]*O/) || longOpt(args, ["open-files-in-pager"]))) return "git grep -O runs a program";
+      if (!grepOk && !GIT_RO.test(sub)) return "git \x27" + (sub.split(/\s+/)[0] || "") + "\x27 is not read-only";
       // Every path a hunter may write is under /tmp/claude-, and a repo there can carry a .git/config
       // whose core.fsmonitor runs on `git status` (measured 2026-10-26). Resolve where git will run.
       if (cwdScratch) return "git run from the scratchpad (a repo written there can execute its config)";

@@ -831,11 +831,14 @@ Nothing state-mutating, and never against a repo under `/tmp/claude-*`: a repo w
 scratchpad can carry a `.git/config` that executes on `git status` (measured 2026-10-26).
 
 **Enforced, not only asked** (2026-10-22): `hooks/review-bash-gate.sh`, a PreToolUse hook on Bash
-in `settings.json` that applies itself only when the call's `agent_type` is `adversarial-reviewer`
-or `review-judge`, denies everything outside this list and the script rules below, and fails
-closed. (A hook in an agent file's frontmatter never fired for PreToolUse: measured 2026-10-22.) A denial is policy: reformulate within the list, never work
-around it. **It is a guardrail against accidental mutation, not a sandbox:** scratchpad scripts
-run unscanned with the session's full privileges, so a hunter steered by its input (e.g. prompt
+in `settings.json` that applies itself only when the call's `agent_type` is `adversarial-reviewer`,
+`review-judge`, `research-critic` or `research-judge`, denies everything outside this list and the
+script rules below, and fails closed. The two research types may additionally run `git grep` and
+`bash .claude/scripts/verify-quote.sh <url> '<quote>'`. (A hook in an agent file's frontmatter
+never fired for PreToolUse: measured 2026-10-22.) A denial is policy: reformulate within the
+list, never work around it. **It is a guardrail against accidental mutation, not a sandbox:**
+scratchpad scripts run
+unscanned with the session's full privileges, so a hunter steered by its input (e.g. prompt
 injection in the diff) is not contained. Neither are the main session or Coder, which read the
 same diff with full Bash; containment, if ever needed, belongs session-wide (Claude Code's native
 sandbox), not in this gate.

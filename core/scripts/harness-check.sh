@@ -442,6 +442,30 @@ rgate 2 "judge: git add"           "git add -A"                         review-j
 rgate 0 "coder: git add passes"    "git add -A"                         coder
 rgate 0 "main session: rm passes"  "rm -rf build"                       -
 rgate 0 "research-lead: curl passes" "curl https://example.com"         research-lead
+# Research critique (2026-10-27): research-critic and research-judge are gated like the hunters, plus
+# `git grep` and `bash .claude/scripts/verify-quote.sh <url> '<quote>'` for those two types only.
+VQ='bash .claude/scripts/verify-quote.sh https://example.com/x "a quote"'
+rgate 0 "critic: verify-quote"          "$VQ"                                research-critic
+rgate 0 "judge: verify-quote"           "$VQ"                                research-judge
+rgate 0 "critic: verify-quote ./ path"  "bash ./.claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic
+rgate 0 "critic: verify-quote abs path" "bash /srv/repo/.claude/scripts/verify-quote.sh https://example.com/x 'a b'" research-critic
+rgate 2 "hunter: verify-quote denied"   "$VQ"                                adversarial-reviewer
+rgate 2 "review-judge: verify-quote denied" "$VQ"                            review-judge
+rgate 2 "critic: verify-quote with .."  'bash .claude/scripts/../scripts/verify-quote.sh https://example.com/x "a quote"' research-critic
+rgate 2 "critic: verify-quote three args" 'bash .claude/scripts/verify-quote.sh https://example.com/x "a quote" extra' research-critic
+rgate 2 "critic: verify-quote one arg"  'bash .claude/scripts/verify-quote.sh https://example.com/x' research-critic
+rgate 2 "critic: other script"          'bash .claude/scripts/harness-check.sh' research-critic
+rgate 2 "critic: verify-quote subst"    'bash .claude/scripts/verify-quote.sh https://example.com/x "$(id)"' research-critic
+rgate 2 "critic: verify-quote redirect" 'bash .claude/scripts/verify-quote.sh https://example.com/x "q" > notes.txt' research-critic
+rgate 0 "critic: git show pinned"       'git show abc123:src/x.ts'           research-critic
+rgate 2 "critic: git add"               'git add -A'                         research-critic
+rgate 0 "critic: git grep pinned"       "git grep -c 'foo' abc123 -- src"    research-critic
+rgate 0 "judge: git grep pinned"        "git grep -c 'foo' abc123 -- src"    research-judge
+rgate 2 "hunter: git grep denied"       "git grep -c 'foo' abc123 -- src"    adversarial-reviewer
+rgate 2 "review-judge: git grep denied" "git grep -c 'foo' abc123 -- src"    review-judge
+rgate 2 "critic: git grep -O (pager)"  "git grep -O sh foo abc123"             research-critic
+rgate 2 "critic: git -c grep"           "git -c core.pager=sh grep foo"      research-critic
+rgate 2 "critic: git grep scratch repo" "git -C $RSCR/evil grep foo"         research-critic
 printf 'not-json' | "$RGATE" >/dev/null 2>&1; [ $? -eq 2 ] && ok "[review-bash] malformed JSON → deny" || fail "[review-bash] malformed JSON → deny"
 printf '' | "$RGATE" >/dev/null 2>&1; [ $? -eq 2 ] && ok "[review-bash] empty input → deny" || fail "[review-bash] empty input → deny"
 grep -qF 'review-bash-gate.sh' "$H/settings.json" && ok "settings.json registers review-bash-gate on PreToolUse(Bash)" || fail "settings.json does not register review-bash-gate.sh (a frontmatter hook never fires for PreToolUse: measured 2026-10-22)"
