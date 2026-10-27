@@ -1448,11 +1448,22 @@ RIN=$(sed -n '/^## Input/,/^## New run/p' "$RC" 2>/dev/null)
 for tok in 'no findings.md' 'stopped' '--effort=quick' '--no-critique' '--critique <folder>'; do
   printf '%s\n' "$RIN" | grep -qF -- "$tok" && ok "research.md § Input mentions $tok" || fail "research.md § Input never mentions $tok"
 done
-for tok in 'subagent_type: "research-critic"' 'subagent_type: "research-judge"' 'critique.md' \
-           'rebuttal: unavailable' 'disputed' 'restarts its current round' 'critique: on' \
-           'settled: true' 'settled: false' 'guides/research-workflow.md § Critique'; do
+for tok in 'subagent_type: "research-judge"' 'critique.md' 'disputed' 'critique: on' \
+           'guides/research-workflow.md § Critique'; do
   grep -qF -- "$tok" "$RC" 2>/dev/null && ok "research.md mentions $tok" || fail "research.md never mentions $tok"
 done
+rsec() { sed -n "${1}p" "$RC" 2>/dev/null; } # one command section or step
+for pair in 'settled: true|/^## Resume/,/^## Standalone/' 'settled: false|/^## Resume/,/^## Standalone/' \
+            'restarts its current round|/^## Resume/,/^## Standalone/' 'never edits|/^- `--critique/,/^## New run/' \
+            'rebuttal: unavailable|/^5\. \*\*Critique/,/^6\. /' 'subagent_type: "research-critic"|/^## New run/,/^## Resume/' \
+            'STOPPED|/^5\. \*\*Critique/,/^6\. /' 'critique settled|/^6\. \*\*Report/,/^## Resume/'; do
+  tok=${pair%%|*}; rg=${pair#*|}
+  rsec "$rg" | tr '\n' ' ' | sed 's/  */ /g' | grep -qF -- "$tok" && ok "research.md has $tok in its section" || fail "research.md lacks $tok in its section ($rg)"
+done
+for tok in '--no-critique' '--effort=quick' 'knobs.width.research-critic'; do
+  rsec '/^3\. \*\*Dispatch/,/^4\. /' | tr '\n' ' ' | sed 's/  */ /g' | grep -qF -- "$tok" && ok "research.md step 3 carries the off condition $tok" || fail "research.md step 3 lacks the off condition $tok"
+done
+rsec '/^## Input/,/^## New run/' | grep -qF 'critic width ×' && fail "research.md § Input restates the reserve formula" || ok "research.md names the reserve by section only"
 RS3=$(sed -n '/^3\. \*\*Dispatch/,/^4\. /p' "$RC" 2>/dev/null)
 printf '%s\n' "$RS3" | grep -qF 'the whole ceiling' && fail "research.md step 3 still passes the whole ceiling" || ok "research.md step 3 no longer passes the whole ceiling"
 printf '%s\n' "$RS3" | grep -qF 'reserve' && ok "research.md step 3 names the reserve" || fail "research.md step 3 lacks 'reserve'"
