@@ -25,10 +25,11 @@ so label its provenance and grep a data path before asserting it.
 The orchestrator's first message is a **hunt capsule**: your role (`hunter-A` … `hunter-H`) and
 angle, one of the four in `guides/thoroughness.md` § Angles (`inside-out`, `outside-in`,
 `time-and-config`, `claims-and-consumers`; `hunter-A` takes the first, `hunter-B` the second, and
-so on; angles cycle above four); the resolved `knobs:`; the resolved base ref and the
-changed-file list; `delta:`, the files and hunks a fix changed since the last round, or `none`;
-the owner's context text, the project's § Stack and § Code layout, the session scratchpad
-path, and the case-file path (for reference only; you never write it). There is **no spec**: you
+so on, unless your capsule names another angle: a dry-check round rotates them; angles cycle above
+four); the resolved `knobs:`; the resolved base ref and the changed-file list; `delta:`, the files
+and hunks a fix changed since the last round, or `none`; the owner's context text, the project's §
+Stack and § Code layout, the session scratchpad path, and the case-file path (for reference only;
+you never write it). There is **no spec**: you
 review the diff as it stands.
 
 Later messages are possibly a **probe send-back** ("Name what you probed in <file>"), the

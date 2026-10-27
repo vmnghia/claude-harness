@@ -137,9 +137,8 @@ fit:
 - the next round would be a dry-check round (the exit check was clean) → `APPROVED`, and the
   recap says the **dry loop was cut at the agent ceiling**, as it does at the `2K` cap.
 
-In `/research` the ceiling never changes the lead's status by itself. A round that does not fit
-is not started; the lead records the gap under Open, naming the ceiling, and goes `PARTIAL`,
-exactly as it does at a teammate's cap.
+A round that does not fit is not started; the lead records the gap under Open, naming the
+ceiling, and goes `PARTIAL`, exactly as it does at a teammate's cap.
 
 The 48 of `thorough` is the session's own Workflow guideline ("keep workflows under 50 agents").
 At `exhaustive` the arithmetic runs the other way: `K = 3` allows 6 dry-check rounds, so a
@@ -152,7 +151,9 @@ The lead counts every team dispatch against it, including the investigator's fre
 dispatches (one per `repro_agent_id` it reports; a resume is not one). After the lead returns,
 `/research` reads `dispatches[]`, and the critique counts against what is left of the whole
 ceiling, so an under-spent lead leaves more room, never less. At `exhaustive`, 64 leaves the lead
-39 after the critique's reserve (5 critics × 4 rounds + 5 judges).
+39 after the critique's reserve (5 critics × 4 rounds + 5 judges). Until the research critique
+lands, `/research` passes the whole ceiling to the lead; the reserve below is the critique plan's
+to subtract.
 
 ## Input
 
@@ -249,7 +250,8 @@ Fix-introduced code is a fresh diff, at every width. Code a fix added has never 
 
 **The delta.** After a fix, the next round's hunt capsule carries `delta:`: Coder's
 `changed_files` plus the hunks that differ between the previous round's tree and this one. The
-orchestrator keeps, in the scratchpad, the previous round's `git diff <base>` and, for every
+orchestrator keeps, under `.claude/runs/<case-file stem>/r<N>/` (`adversarial-review.md` § The
+loop step 5), the previous round's `git diff <base>` and, for every
 path from `git ls-files --others --exclude-standard`, the path and its `sha256sum`: the inputs
 of the tree hash (`adversarial-review.md` § Case file), kept per file instead of hashed
 together. The delta is:
@@ -296,7 +298,8 @@ This is `research-discipline.md` § 3 applied to a review: a null needs proof th
 adds no **new finding**.
 
 Three names, two things: `--dry`, `project.md` `"dry_rounds"` and `knobs.dry` are `K`, the
-setting; the state block's `dry_rounds` is the count of dry-check rounds run so far.
+setting; the state block's `dry_rounds` is the count of dry-check rounds dispatched so far
+(incremented at dispatch; a `round_kind: probe` round is not one).
 
 A **new finding** is one that is not a duplicate of any earlier round's finding, at **any**
 severity, by the breaker's sameness rule (same `file`, lines within 5, 60 % of `issue` words

@@ -558,7 +558,7 @@ judge and Coder dispatch counts once toward `max_agents` (`thoroughness.md § Co
    round** (`review_iter++`); an upheld finding Coder rejects a second time trips the breaker. When
    every rejection was refuted and nothing else was sent, the round has no `AGREED`
    `blocker`/`major` left: go to the exit check, not to a new round.
-5. **Next round.** Rewrite the state block (`tree` from the new diff). Take this round's
+5. **Next round.** Rewrite the state block (`tree` from the new diff, `round`). Take this round's
    snapshot and compute the delta (`thoroughness.md § Delta and probed`) against the previous
    round's: every round takes one, dry-check and probe rounds included. Snapshots live next to
    the case file, never in the session scratchpad, so a resume finds them: `D` is
@@ -566,7 +566,7 @@ judge and Coder dispatch counts once toward `max_agents` (`thoroughness.md § Co
    previous round's, `BASE` the state block's `base`. Hunters never read `.claude/runs/`.
 
    ```bash
-   cd "$(git rev-parse --show-toplevel)" && mkdir -p "$D/files"
+   cd "$(git rev-parse --show-toplevel)" && rm -rf "$D" && mkdir -p "$D/files"
    git diff "$BASE" -- . ':!.claude' > "$D/diff.patch"
    git -c core.quotePath=false diff --name-only -z "$BASE" -- . ':!.claude' \
      | while IFS= read -r -d '' f; do
@@ -630,12 +630,15 @@ about $X": `M` is the bound on rounds from `thoroughness.md § Dry rounds`, `W` 
 current round on the new tree. Either way, start the current round again with **fresh** hunters
 from the recorded `round_kind`, `review_iter`, `dry_rounds`, `dry_streak`, `dispatched` and
 `knobs` and the recorded states of earlier rounds; nothing but `tree` is recomputed (`knobs` is
-never re-resolved). A restarted dry-check round was counted in `dry_rounds` when first
-dispatched and is not counted again; a restarted probe round takes its delta from the previous
-round's `uncovered:` line; a missing snapshot is handled as in § The loop step 5. Mid-round
-debate state is never restored. The abandoned attempt's findings stay in the state block with
-`state: SUPERSEDED` and their ids; the restart's ids get the next letter suffix (`r3b-`, `r3c-`),
-so nothing in the case file is overwritten. When fixes are on, the branch gate runs again before
+never re-resolved). A restarted dry-check round was counted in `dry_rounds` when first dispatched
+and is not counted again; a restarted probe round takes its delta from the previous round's
+`uncovered:` line; a missing snapshot is handled as in § The loop step 5. When `tree` differs,
+retake `r<N>` (step 5's snapshot block) before restarting; the restarted round's delta is
+recomputed from `r<N-1>` and `r<N>` as in § The loop step 5. Add the abandoned attempt's
+`hunters:` to `dispatched` before restarting. Mid-round debate state is never restored. The
+abandoned attempt's findings stay in the state block with `state: SUPERSEDED` and their ids; the
+restart's ids get the next letter suffix (`r3b-`, `r3c-`), so nothing in the case file is
+overwritten. When fixes are on, the branch gate runs again before
 any fix dispatch.
 
 ## Case file
@@ -650,6 +653,7 @@ The first fenced block is the state block, rewritten at every round boundary:
 ```yaml
 state:
   review_iter: 0
+  round: <N>                                    # the current round number; r<N> snapshots and '## Round N' headings use it
   round_kind: fix                               # fix (round 1, after a fix) | dry | probe
   dry_rounds: 0                                 # dry-check rounds dispatched (cap 2K)
   dry_streak: 0                                 # consecutive dry rounds so far

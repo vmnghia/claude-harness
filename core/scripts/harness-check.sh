@@ -1109,6 +1109,21 @@ for pr in '| hunters / critics per round | 2 | 2 | 3 | 5 |' '| `--max-agents` de
 done
 grep -F -- '--effort=quick' "$TH" 2>/dev/null | grep -qF '"max_agents": 48' \
   && ok "thoroughness.md: --effort=quick beats project.md \"max_agents\": 48 (one line)" || fail "thoroughness.md lacks the --effort=quick vs \"max_agents\": 48 example on one line"
+# final-review fixes, commit 1: one home per contract
+grep -qF 'in the scratchpad' "$TH" 2>/dev/null && fail "thoroughness.md § Delta keeps snapshots 'in the scratchpad' (they live under .claude/runs/)" || ok "thoroughness.md § Delta: snapshots are not in the scratchpad"
+grep -qF 'passes the whole ceiling' "$TH" 2>/dev/null && ok "thoroughness.md: /research passes the whole ceiling to the lead" || fail "thoroughness.md lacks 'passes the whole ceiling'"
+grep -qF 'round_kind: probe' "$TH" 2>/dev/null && ok "thoroughness.md: a probe round is not a dry-check round" || fail "thoroughness.md lacks 'round_kind: probe' in § Dry rounds"
+grep -qF 'run so far' "$TH" 2>/dev/null && fail "thoroughness.md still defines dry_rounds as 'run so far'" || ok "thoroughness.md defines dry_rounds as dispatched"
+grep -qF 'by itself' "$TH" 2>/dev/null && fail "thoroughness.md still says the ceiling never changes the status 'by itself'" || ok "thoroughness.md: the ceiling's PARTIAL is unconditional"
+grep -qF 'rm -rf "$D"' "$AR" 2>/dev/null && ok "adversarial-review.md snapshot block is idempotent (rm -rf \"\$D\")" || fail "adversarial-review.md snapshot block lacks rm -rf \"\$D\""
+sed -n '/^### Resume/,/^## Case file/p' "$AR" 2>/dev/null | grep -qF 'retake' \
+  && ok "adversarial-review.md § Resume retakes the snapshot when tree differs" || fail "adversarial-review.md § Resume lacks 'retake'"
+sed -n '/^### Resume/,/^## Case file/p' "$AR" 2>/dev/null | tr '\n' ' ' | sed 's/  */ /g' | grep -qF "abandoned attempt's \`hunters:\` to \`dispatched\`" \
+  && ok "adversarial-review.md § Resume counts the abandoned hunters" || fail "adversarial-review.md § Resume does not add the abandoned hunters to dispatched"
+sed -n '/^## Case file/,/^## Tool/p' "$AR" 2>/dev/null | grep -qF 'round:' \
+  && ok "adversarial-review.md state block has round:" || fail "adversarial-review.md state block lacks round:"
+grep -qF 'unless your capsule names another angle' "$HUNTER" 2>/dev/null \
+  && ok "adversarial-reviewer: a capsule may name another angle (dry rounds rotate)" || fail "adversarial-reviewer: angle assignment ignores the dry-round rotation"
 for tok in quick standard thorough exhaustive --effort --width --dry --max-agents 8 warn cycle hunter-H time-and-config claims-and-consumers probed "tried:" "reason: agent ceiling" "cut at its cap" "counts once toward" "git ls-files --others" "--effort=quick" '"max_agents": 48' '"width": {"searcher": 2}'; do
   grep -qF -- "$tok" "$TH" 2>/dev/null && ok "thoroughness.md mentions $tok" || fail "thoroughness.md never mentions $tok"
 done
