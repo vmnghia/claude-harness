@@ -219,8 +219,9 @@ the differences this section names.
 write-up is final: the lead's run splits into *gather and draft* (first return) and *finish*
 (on step 8's message). Skipped by `--no-critique`, by `--effort=quick` (the research critique row of
 `thoroughness.md § Presets`), and by a lead status of `STOPPED` (nothing to review). On
-`AWAITING_HUMAN` the critique waits for the resume that ends in `ANSWERED` / `PARTIAL`.
-`--resume` on a finished run never starts one (§ Standalone).
+`AWAITING_HUMAN` the critique waits for the resume that ends in `ANSWERED` / `PARTIAL`. It
+starts only when the run has no `critique.md`; `--resume` never starts or restarts a settled
+one (§ Closing the run, "Start, restart, resume").
 
 **Knobs and the ceiling.** Critic width is `knobs.width.research-critic` and `K` is
 `knobs.dry`, resolved once by `/research` (`thoroughness.md § Input`); critics and judges get
@@ -253,15 +254,17 @@ critic's letter plus its own sequence (`A1`, `B2`); the case file prefixes the r
    cross-examination (`adversarial-review.md` § A round step 2 for a re-graded severity).
    `minor` / `nit` resolve here by § A round step 3 (`AGREED`, `WITHDRAWN`, `CONTESTED`) and
    never go up the ladder. A `blocker` / `major` with a majority `VALID` is `AGREED`; every
-   other `blocker` / `major` is **open**. No turns run between critics: an open finding is
-   debated with the lead. Rulings with `same_as` merge at synthesis (step 6).
+   other `blocker` / `major` is **open**. With a lead, no turns run between critics: an open
+   finding is debated with the lead (step 4); without one, § Closing the run, "If the lead
+   cannot be resumed". Rulings with `same_as` merge at synthesis (step 6).
 3. **Rebuttal.** One `SendMessage` to the lead's id (`lead.txt`): the critique message, with
    every `AGREED` finding and every open `blocker` / `major` in critique-finding shape, each
    with the cross-examination rulings on it verbatim, plus the `CONTESTED` ones for
    information. The lead replies with a `REBUTTAL` block (§ Rebuttal); the orchestrator checks
    that the fields each `response` requires exist, appends the block and relays it; it never
    judges content. If the `SendMessage` fails, § Closing the run, "If the lead cannot be
-   resumed", applies from here.
+   resumed", applies from here. When the critique message would carry no finding at all,
+   steps 3–5 are skipped and the synthesis records `rebuttal: not needed`.
 4. **Re-check and turns.** Each asserting critic gets the re-check message: the lead's
    responses on its own findings and the current `findings.md`. A finding's two sides are its
    critic and the lead. The lead takes the designated challenger's seat (the author disputes
@@ -272,8 +275,8 @@ critic's letter plus its own sequence (`A1`, `B2`); the case file prefixes the r
    - `MAINTAIN` → `ACCEPT` (→ `WITHDRAWN`) or `CHALLENGE` with new evidence (→ the lead's
      next turn).
    - `OUTSIDE_RUN` → `ACCEPT` carrying `outside_run: <question>` (both sides say it →
-     `ESCALATED` with the lead's question, no judge), or `CHALLENGE` with new evidence (→ the
-     lead's next turn).
+     `ESCALATED` with the critic's `outside_run` question, no judge), or `CHALLENGE` with new
+     evidence (→ the lead's next turn).
 
    The lead's next turn is the turn message to the lead and its reply another `REBUTTAL` block
    for the still-open ids; a `FIX` is applied before that reply too. The evidence gate,
@@ -282,10 +285,18 @@ critic's letter plus its own sequence (`A1`, `B2`); the case file prefixes the r
    are exhausted or the cap is hit. Turns are for `blocker` / `major` only: on a `minor` /
    `nit` or a `CONTESTED` finding only a `FIX` is re-checked, once (`ACCEPT` → `FIXED`;
    anything else leaves the cross-examination state, the lead's response recorded).
+
+   Findings a critic `added` in cross-examination are ruled on by every other critic in its
+   re-check message (the cross-examination message reused for them, as `adversarial-review.md`
+   § A round step 2 does; a critic with no re-check pending gets a cross-examination message),
+   tallied the same way, and go to the lead in its next turn message, or in a critique message
+   of their own when no turn is pending.
 5. **Judge.** For every stalemated `blocker` / `major`, a fresh `research-judge` with the judge
    capsule (several in one message when there are several). It rules `UPHELD | REFUTED |
-   OUTSIDE_RUN` (`question` required with `OUTSIDE_RUN`). Then the judge-ruling message to the
-   critic and the lead, one turn each:
+   OUTSIDE_RUN` (`question` required with `OUTSIDE_RUN`). Then the judge-ruling message, one
+   turn for the side the ruling went against: on `OUTSIDE_RUN` both sides; on `UPHELD` the
+   lead, with the critic receiving the ruling for information only (no reply expected); on
+   `REFUTED` the critic, with the lead receiving it for information only:
 
    | Ruling | The critic accepts with | The lead accepts with | A challenge is |
    |---|---|---|---|
@@ -295,7 +306,9 @@ critic's letter plus its own sequence (`A1`, `B2`); the case file prefixes the r
 
    Every challenge carries new evidence. No challenge → resolved per the ruling: `UPHELD` →
    the lead's `FIX`, re-checked once by the critic (`ACCEPT` → `FIXED`, `CHALLENGE` →
-   `STALEMATE`); `REFUTED` → `REFUTED`; `OUTSIDE_RUN` → `ESCALATED` with the judge's question.
+   `STALEMATE`); `REFUTED` → `REFUTED`. A `FIX` on an `OUTSIDE_RUN` ruling is re-checked once
+   like an `UPHELD` `FIX` (`ACCEPT` → `FIXED`); only an unfixed, unchallenged `OUTSIDE_RUN`
+   becomes `ESCALATED`, with the judge's question.
    A challenge → one judge reply (`SendMessage` to the judge's id), then the challenging side
    gets it and one more turn: accepting resolves per the ruling; a second challenge is
    `STALEMATE`, no content check. An upheld finding the lead rejects twice therefore ends
@@ -308,16 +321,16 @@ critic's letter plus its own sequence (`A1`, `B2`); the case file prefixes the r
    | State | Meaning |
    |---|---|
    | `FIXED` | the lead's edit was accepted by the finding's critic |
-   | `AGREED` | valid `minor` / `nit`, left as a note |
-   | `WITHDRAWN` | the critic conceded or accepted the lead's evidence |
+   | `AGREED` | valid; `minor` / `nit` (left as a note), or any severity when there is no author to fix it (listed for the owner) |
+   | `WITHDRAWN` | the critic conceded, or accepted the other side's evidence |
    | `REFUTED` | the judge refuted it and nobody overturned that |
-   | `ESCALATED` | reduced to one question outside the run (shared `OUTSIDE_RUN`, or the judge's) |
+   | `ESCALATED` | reduced to one question outside the run (the judge's, else the critic's `outside_run`) |
    | `STALEMATE` | the ladder ran out, or `reason: agent ceiling` |
    | `CONTESTED` | `minor` / `nit` not settled in cross-examination |
 
    `ESCALATED` and `STALEMATE` are **`disputed`**: each gets a `disputed:` entry with its
-   question (the judge's `question`, else the shared `OUTSIDE_RUN` question, else "which holds
-   on <id>: the critic's position or the lead's?").
+   question (the judge's `question` when a judge ruled, else the critic's `outside_run`
+   question, else "which side holds on <id>?" with both final positions attached).
 7. **Next round or close.** § Dry loop decides whether a further round runs; when none does,
    § Closing the run.
 
@@ -347,30 +360,33 @@ edits it.
 `K` is `knobs.dry`; the rules are `thoroughness.md § Dry rounds`, with the critique's own
 sameness rule.
 
-- `K = 0`: exactly one round.
+- `K = 0`: exactly one round; the report says "one round, `K = 0`", never "ended dry".
 - **Duplicate.** Two critique findings are the same when they share `target` and either the
   same `kind` or 60 % of `claim` words shared (lowercased, whitespace collapsed), so quoting a
   different sentence of the same Finding does not read as new. There is no line component:
   targets are section references.
 - **New finding**: not a duplicate of any earlier round's finding, at any severity, and it
   survives its cross-examination (any end state but `WITHDRAWN` or `REFUTED`).
-- **Further rounds.** With `K > 0`, round 1 is always followed by a further round: like a
-  dry-check round in `/adversarial-review`, only a further round can be dry. A further round is
-  a whole round (steps 1–6, rebuttal included) with **fresh** critics on the current
-  `findings.md`, angles rotated; earlier rounds' findings are never sent to them (the case file
-  keeps them for the sameness rule). `dry_rounds` is incremented when a further round is
-  dispatched, before its hunt.
-- **Counting.** A further round with no new finding is dry and increments `dry_streak`; a new
-  finding in any round resets it to 0.
-- **End.** After each round's synthesis: `dry_streak` at `K` → the critique ended dry;
-  otherwise `dry_rounds` at its hard cap `2K` → it ends, and the report says the loop was
-  **cut at its cap**, not dry; otherwise a further round (subject to the ceiling). The critique
-  therefore runs at most `1 + 2K` rounds.
+- **Dry round.** Any round with no new finding is dry, round 1 included, and increments
+  `dry_streak`; a round with a new finding resets it to 0.
+- **Further rounds.** With `K > 0`, after any non-dry round, or after a dry round while
+  `dry_streak < K`, a further round runs: a whole round (steps 1–6, rebuttal included) with
+  **fresh** critics on the current `findings.md`, angles rotated; earlier rounds' findings are
+  never sent to them (the case file keeps them for the sameness rule). `dry_rounds` counts
+  further rounds and is incremented when one is dispatched, before its hunt.
+- **End.** After each round's synthesis: `dry_streak` reaching `K` → the critique ended dry;
+  otherwise `dry_rounds` reaching its hard cap of `2K` further rounds → it ends, and the report
+  says the loop was **cut at its cap**, not dry; otherwise a further round (subject to the
+  ceiling). The critique therefore runs at most `1 + 2K` rounds. The reserve's
+  `critic width × (K + 1)` covers the shortest path to a dry end whether round 1 is dry or not;
+  rounds past it run on what the lead left of the ceiling and are cut at the agent ceiling when
+  they do not fit.
 
 ### Closing the run
 
 8. **"Critique settled"** goes to the lead (`SendMessage`) with the final table and the
-   `disputed:` entries. The lead:
+   `disputed:` entries, after the orchestrator writes `settled: true` in the state block. The
+   lead:
    - writes **`## Critique`** in `findings.md`: the template's checked-claim table, one row per
      finding (`Claim (quoted) | Verdict | Severity | Evidence`, verdict = its end state), or
      `no findings` when no round raised one, plus one line naming `critique.md`;
@@ -394,14 +410,29 @@ sameness rule.
    remain. A critique with no findings leaves the status unchanged.
 9. **Report.** `/research` shows the lead's final block, Answer, Next, the critique table and
    every `disputed` question on its own line, then the Confluence draft line, and says whether
-   the loop ended dry, was cut at its cap, or was cut at the agent ceiling.
+   the loop ended dry, was cut at its cap, was cut at the agent ceiling, or ran one round
+   (`K = 0`).
+
+**Start, restart, resume.** A critique starts only when no `critique.md` exists for the run
+(§ Standalone writes a new file of its own). `--resume` on a run whose `critique.md` says
+`settled: true` never starts or restarts a critique: the "done: <answers>" resume after a
+disputed close only finishes the lead. With `settled: false` it restarts the current round
+with fresh critics (§ Case file, Resume).
 
 **If the lead cannot be resumed** (the session that ran it ended, `SendMessage` fails):
-`critique.md` records the round with `rebuttal: unavailable`, no `findings.md` edit happens,
-and the round goes from cross-examination straight to synthesis (no rebuttal, re-check or
-judge). The report shows the critique table beside the untouched Answer with one line saying
-the author never answered; the owner reads both. No fresh lead is started for an existing run
-(§ Flow and roles, "The lead itself").
+`critique.md` records `rebuttal: unavailable` and no `findings.md` edit happens. From then on
+the critique runs without an author, as `adversarial-review.md` § A round steps 4–5 among the
+critics: an open `blocker` / `major` (majority `FALSE_POSITIVE`, or no majority) goes through
+turns between its critic and its **designated challenger**, the lowest-letter critic that
+ruled `FALSE_POSITIVE`, else `UNCLEAR` (turn message and turn reply, § Debate rules), then a
+stalemated one goes up the judge ladder (judge capsule; the judge-ruling message to both
+critics). Nothing can be fixed: an `AGREED` finding of any severity stays `AGREED`, an
+`UPHELD` one resolves to `AGREED`, a `REFUTED` one to `REFUTED`, and a judge `OUTSIDE_RUN`
+(→ `ESCALATED`) or a `STALEMATE` becomes a `disputed` question for the owner. At the end the
+orchestrator writes `settled: true`. The report shows the critique table, every `AGREED`
+`blocker` / `major` and every `disputed` question beside the untouched Answer, with one line
+saying the author never answered; the owner reads both. No fresh lead is started for an
+existing run (§ Flow and roles, "The lead itself").
 
 ### Case file
 
@@ -415,7 +446,8 @@ state block, rewritten at every round boundary:
 state:
   critique_round: <N>                     # the current round
   dry_rounds: 0                           # further rounds dispatched (cap 2K)
-  dry_streak: 0                           # consecutive dry further rounds
+  dry_streak: 0                           # consecutive dry rounds, round 1 included
+  settled: false                          # true at "critique settled" (no lead: at the end)
   dispatched: <n>                         # the run's dispatches so far (§ Critique, ceiling)
   knobs: {…}                              # as resolved by /research, never re-resolved
   rebuttal: lead | unavailable
@@ -432,8 +464,10 @@ Then, per round, verbatim appends under `## Round N`: `### Hunt A|B|C` (one per 
 `### Judge <id>` (capsule summary, ruling, both turns, the reply), `### Synthesis` (the
 table, then the loop's decision). Every block is appended as its author wrote it.
 
-**Resume.** A critique in progress restarts its current round with fresh critics from the
-state block; mid-round debate state is never restored (as `adversarial-review.md` § Resume).
+**Resume.** A critique starts only when the run has no `critique.md`. With `settled: true` it
+is never started or restarted again; with `settled: false` it restarts its current round with
+fresh critics from the state block; mid-round debate state is never restored (as
+`adversarial-review.md` § Resume).
 The abandoned attempt's critics stay counted in `dispatched`; its findings stay in the state
 block with `state: SUPERSEDED`, and the restart's ids take the next letter suffix (`r2b-A1`).
 

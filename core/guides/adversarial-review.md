@@ -480,8 +480,9 @@ pinned SHA against a count in a table).
 block's line, verbatim); the framing's question verbatim; `project.md` § Stack verbatim (or
 `project.md missing` / `project.md still has TODOs`), for versioned docs; the session scratchpad
 path and the critic's own subfolder (`<scratchpad>/crit-r<N>-<role>/`); the critique case-file
-path (for reference only; the critic never reads or writes it); the never-read list: every
-investigation folder but this one, `.claude/runs/` (the case file included),
+path (for reference only); the never-read list: `<folder>/critique*.md` (the critique case
+files: critics and the judge never read them, and a further round's critics must not see
+earlier rounds' findings), every investigation folder but this one, `.claude/runs/`,
 `.claude/reports/` and any plugin store such as `.remember/`. Never the
 lead's transcript, never another critic's output, never the owner's conversation.
 
@@ -527,9 +528,10 @@ what you answer with `peer_added_evidence`."
 
 **Judge capsule** (orchestrator → `research-judge`, the dispatch prompt). The investigation
 folder path; one finding in critique-finding shape; the critic's and the lead's final turns on
-it verbatim; every script path and output either side produced on it; the scratchpad path and
-the judge's own subfolder; the never-read list of the critique capsule. Nothing about the
-orchestrator's reasoning or the rest of the debate.
+it verbatim (without a lead: the critic's and its designated challenger's); every script path
+and output either side produced on it; the scratchpad path and the judge's own subfolder;
+the never-read list of the critique capsule. Nothing about the orchestrator's reasoning or the
+rest of the debate.
 
 **Judge reply** (in place of § Judge reply):
 
@@ -548,10 +550,13 @@ payload:
 ---
 ```
 
-**Judge-ruling message** (orchestrator → the critic and the lead). "The judge ruled on <id>:
-<judge block verbatim>. One turn: accept, or challenge with new evidence." The critic replies
-with a turn reply (`ACCEPT | CHALLENGE`), the lead with a `REBUTTAL` block (`FIX` accepts an
-`UPHELD`); `research-workflow.md` § Critique step 5 has which response accepts which ruling.
+**Judge-ruling message** (orchestrator → the side the ruling went against; both on
+`OUTSIDE_RUN`). "The judge ruled on <id>: <judge block verbatim>. One turn: accept, or
+challenge with new evidence." The critic replies with a turn reply (`ACCEPT | CHALLENGE`), the
+lead with a `REBUTTAL` block (`FIX` accepts an `UPHELD`); `research-workflow.md` § Critique
+step 5 has which response accepts which ruling. The side ruled for gets the same message with
+"For information; no reply." in place of the turn line. Without a lead the message goes to the
+critic and its designated challenger, as § Judge-ruling message.
 
 **"Critique settled" message** (orchestrator → lead, `SendMessage`). "Critique settled after
 <n> round(s), <ended dry | cut at its cap | cut at the agent ceiling | one round, K = 0>.

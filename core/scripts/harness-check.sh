@@ -1270,9 +1270,15 @@ for hd in '### The round' '### Rebuttal' '### Dry loop' '### Closing the run' '#
   printf '%s\n' "$RCQ" | grep -qxF -- "$hd" && ok "§ Critique has '$hd'" || fail "§ Critique lacks '$hd'"
 done
 for tok in 'FIXED' 'REBUTTAL' 'OUTSIDE_RUN' 'rebuttal: unavailable' 'critique.md' 'second main-session file' \
-           '--critique' '1 + 2K' '60 %' 'never edits' 'critic width × (K + 1)'; do
+           '--critique' 'critic width × (K + 1)'; do
   printf '%s\n' "$RCQ" | grep -qF -- "$tok" && ok "§ Critique mentions $tok" || fail "§ Critique never mentions $tok"
 done
+sub() { printf '%s\n' "$RCQ" | sed -n "/^### $1\$/,/^##/{/^### $1\$/b;/^##/q;p;}"; } # one ### subsection's body
+for tok in '1 + 2K' '60 %'; do
+  sub 'Dry loop' | grep -qF -- "$tok" && ok "§ Critique › Dry loop mentions $tok" || fail "§ Critique › Dry loop never mentions $tok"
+done
+sub 'Standalone' | grep -qF 'never edits' && ok "§ Critique › Standalone says it never edits findings.md" || fail "§ Critique › Standalone lacks 'never edits'"
+sub 'Case file' | grep -qF 'settled:' && ok "§ Critique › Case file state block has settled:" || fail "§ Critique › Case file lacks settled:"
 grep -qxF '### Critique variants' "$AR" 2>/dev/null && ok "adversarial-review.md has '### Critique variants'" || fail "adversarial-review.md lacks '### Critique variants'"
 ACV=$(sed -n '/^### Critique variants$/,/^## /p' "$AR" 2>/dev/null)
 for tok in 'research-critic' 'critic-H' 'null-without-control' 'response: FIX | MAINTAIN | OUTSIDE_RUN' 'new_evidence' 're-check'; do
