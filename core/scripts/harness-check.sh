@@ -15,6 +15,10 @@ FAILS=0
 
 ok()   { echo "  PASS  $1"; }
 fail() { echo "  FAIL  $1"; FAILS=$((FAILS + 1)); }
+# Milliseconds on a monotonic clock. Timing checks must not use $SECONDS or date: WSL2 steps the
+# wall clock forward to resync, and a 2.06 s hook run read as 5.3 s wall time (measured 2026-10-27,
+# 2 of 30 runs), which failed the session-context check below with nothing slow.
+mono_ms() { node -e 'process.stdout.write(String(process.hrtime.bigint() / 1000000n))'; }
 check() { # check <description> <command...>
   local desc="$1"; shift
   if "$@" >/dev/null 2>&1; then ok "$desc"; else fail "$desc"; fi
@@ -231,8 +235,8 @@ printf '%s' "$O" | grep -q 'lock=' && fail "session-context prints lock= with no
 printf 'owner_session: abc\nowner_name: n\nexpected_end: 2099-01-01T00:00:00Z\n' > "$SCT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
 O=$(sc2 '{"session_id":"abc","source":"resume"}'); { printf '%s' "$O" | grep -q 'lock=n' && printf '%s' "$O" | grep -q '(yours)'; } && ok "session-context shows the lock, marked (yours) for its owner" || fail "session-context lock field: $O"
 O=$(sc2 '{not json'); RC=$?; { [ "$RC" -eq 0 ] && printf '%s' "$O" | grep -q '^\[harness\]'; } && ok "session-context: malformed stdin still prints its line, exit 0" || fail "session-context malformed stdin: rc=$RC $O"
-T0=$SECONDS; CLAUDE_PROJECT_DIR="$SCT" timeout 15 bash "$SCH" >/dev/null 2>&1 < <(sleep 20); EL=$((SECONDS-T0))   # <(…): stdin stays open, and bash doesn't wait for it (a pipe would)
-[ "$EL" -lt 5 ] && ok "session-context returns fast on an open, silent stdin (${EL}s)" || fail "session-context blocked on an open stdin (${EL}s) — it must never hang a session start"
+T0=$(mono_ms); CLAUDE_PROJECT_DIR="$SCT" timeout 15 bash "$SCH" >/dev/null 2>&1 < <(sleep 20); EL=$(( $(mono_ms) - T0 ))   # <(…): stdin stays open, and bash doesn't wait for it (a pipe would)
+[ "$EL" -lt 5000 ] && ok "session-context returns fast on an open, silent stdin (${EL} ms)" || fail "session-context blocked on an open stdin (${EL} ms) — it must never hang a session start"
 printf 'owner_session: old\nowner_name: n\nowner_session: abc\nexpected_end: 2099-01-01T00:00:00Z\n' > "$SCT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
 O=$(sc2 '{"session_id":"abc","source":"clear"}'); printf '%s' "$O" | grep -q '(yours)' && ok "session-context: (yours) when any owner_session line matches" || fail "session-context two-line owner: $O"
 rm -rf "$SCT"
@@ -310,8 +314,8 @@ echo "== 2h. Review minors, round 3 (2026-10-21) =="
 RT=$(mktemp -d); mkdir -p "$RT/.claude/hooks/lib" "$RT/.claude/runs"; cp "$H/hooks/lib/project-config.js" "$RT/.claude/hooks/lib/"
 printf '# p\n\n```json harness\n{"heavy_commands": ["^(a+)+$", "yarn build"]}\n```\n' > "$RT/.claude/project.md"
 printf 'owner_session: X\nowner_name: o\nexpected_end: 2099-01-01T00:00:00Z\n' > "$RT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
-T0=$SECONDS; printf '{"session_id":"Y","tool_input":{"command":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!"}}' | CLAUDE_PROJECT_DIR="$RT" timeout 30 bash "$H/hooks/lock-gate.sh" >/dev/null 2>&1; EL=$((SECONDS-T0))
-[ "$EL" -le 6 ] && ok "lock-gate: a catastrophic heavy_commands regex is cut off fast (${EL}s; fails open)" || fail "lock-gate stalled ${EL}s on a catastrophic regex"
+T0=$(mono_ms); printf '{"session_id":"Y","tool_input":{"command":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!"}}' | CLAUDE_PROJECT_DIR="$RT" timeout 30 bash "$H/hooks/lock-gate.sh" >/dev/null 2>&1; EL=$(( $(mono_ms) - T0 ))
+[ "$EL" -le 6000 ] && ok "lock-gate: a catastrophic heavy_commands regex is cut off fast (${EL} ms; fails open)" || fail "lock-gate stalled ${EL} ms on a catastrophic regex"
 RO=$(printf '{"session_id":"Y","tool_input":{"command":"yarn build"}}' | CLAUDE_PROJECT_DIR="$RT" bash "$H/hooks/lock-gate.sh" 2>/dev/null)
 printf '%s' "$RO" | grep -q '"ask"' && ok "lock-gate: a normal heavy command still asks next to a pathological pattern" || fail "lock-gate: normal heavy command not asked: $RO"
 rm -rf "$RT"
