@@ -46,11 +46,8 @@ Later messages may be the **cross-examination message** (the other critics' find
 a **turn message** (only when the run has no lead), and a **judge-ruling message**. Each names
 the reply shape it expects.
 
-**Angles.** Your capsule names yours; take it as given. By default `critic-A` takes
-`evidence-first`, `critic-B` `argument-first`, `critic-C` `scope-and-decisions`, and from
-`critic-D` they cycle (`critic-D` `evidence-first` again, on to `critic-H`). A further round
-rotates them (`guides/thoroughness.md` § Angles). The angle sets only the order you start in:
-every critic covers all seven checks.
+**Angles.** Your capsule names yours; take it as given. The angle sets only the order you
+start in: every critic covers all seven checks.
 
 - `evidence-first`: 1, 2, 3, then 4–7.
 - `argument-first`: 4, 5, then 1–3, 6, 7.
@@ -86,14 +83,16 @@ every critic covers all seven checks.
 
 3. **Re-open every piece of evidence you rule on.** Never take the citation's word for it:
    - `path:line@sha`: `git show <sha>:<path>` and read the cited line with its surroundings.
-     A count at a pinned SHA: `git show <sha>:<path> | grep -c '<pattern>'` per file (the
-     gate's read-only git list has no `git grep`). An unpinned code claim is check 2.
+     A count at a pinned SHA: `git grep -c '<pattern>' <sha> -- <paths>`. An unpinned code
+     claim is check 2.
    - A `results.txt ===== Qn =====` marker: split the file by marker with a scratchpad script
      (`node` / `python3 -I`, in your subfolder) and check that section holds the query and the
      rows the claim says.
-   - A web quote: `bash .claude/scripts/verify-quote.sh <url> "<quote>"` (`MATCH`, `NO MATCH`
+   - A web quote: `bash .claude/scripts/verify-quote.sh <url> '<quote>'` (`MATCH`, `NO MATCH`
      or `UNCHECKABLE`), and `WebFetch` the cited URL when you need the surrounding text or the
-     version.
+     version. Single-quote the quote, write an apostrophe in it as `'\''`, and drop its
+     backticks (the script normalises them away on both sides): a double-quoted `$`, backtick
+     or `"` expands or breaks the command, and its `NO MATCH` would be a false finding.
    - Check 6: the related spec's Decisions table under `.claude/specs/` and
      `git log --date=format:'%m-%d %H:%M' --pretty=format:'%h %ad %s' -25` (§ 5).
 
@@ -115,7 +114,8 @@ every critic covers all seven checks.
    missed in `added`, continuing your own id sequence.
 6. **Re-check the author's responses when asked.** You are the asserter and the lead is your
    designated challenger: its `MAINTAIN` is a challenge, and the burden of proof stays with
-   you. Answer each response in one `TURN` block, `response: ACCEPT | CHALLENGE`:
+   you. Answer all responses in one `TURN` block, one `turns` entry each,
+   `response: ACCEPT | CHALLENGE`:
    - `FIX`: re-read the current `findings.md` at the target. `ACCEPT` when the edit closes the
      finding; else `CHALLENGE` naming the line that still fails.
    - `MAINTAIN`: re-open the lead's `new_evidence`. `ACCEPT` when it holds; else `CHALLENGE`
@@ -143,10 +143,10 @@ finding without new evidence only exhausts your side.
 - No `findings.md`, case-file or repo edits. No `Edit`, no `Write`, no heredoc or redirect
   outside your scratchpad subfolder. The lead is the only writer of `findings.md`.
 - Bash: read-only git as `guides/adversarial-review.md` § Tool boundaries lists it
-  (`git show <sha>:<path>`, `git log`, `git ls-files`, …); `node` / `python3 -I` on a script
-  you wrote under your scratchpad subfolder, which never writes to the repo, builds, installs
-  or uses the network; the gate's read-only filters; and
-  `bash .claude/scripts/verify-quote.sh <url> "<quote>"`, exactly those two arguments. A
+  (`git show <sha>:<path>`, `git log`, `git ls-files`, …) and `git grep` at a pinned SHA;
+  `node` / `python3 -I` on a script you wrote under your scratchpad subfolder, which never
+  writes to the repo, builds, installs or uses the network; the gate's read-only filters; and
+  `bash .claude/scripts/verify-quote.sh <url> '<quote>'`, exactly those two arguments. A
   denial is policy: reformulate within the list, never work around it.
 - No new evidence. No `searcher`, no new web search, no `WebFetch` of a URL the run does not
   cite. What the run's evidence cannot settle is `unverifiable`, not a reason to go looking.

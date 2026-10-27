@@ -36,18 +36,22 @@ for nothing else.
 
 ## Procedure
 
-1. **Read the run, then the finding's target.** Read `findings.md` end to end as it stands
-   now (a `FIX` may have changed it), then everything the finding and both turns cite in the
-   folder: `run-log.md`, `results.txt`, `capture.md`, `evidence-*.md`, `raw/`, `design/`.
+1. **Read the run, then the finding's target.** Read `findings.md` end to end, then
+   everything the finding and both turns cite in the folder: `run-log.md`, `results.txt`,
+   `capture.md`, `evidence-*.md`, `raw/`, `design/`. You rule on the claim **as quoted** in
+   the finding, not on the file's current wording.
 2. **Re-open every pin, marker, quote and ledger row** both sides cite, and the ones each
    side relied on without citing: the ledger row one side says carries the label, the control
    the other says is missing.
    - `path:line@sha`: `git show <sha>:<path>`, the cited line with its surroundings; a count
-     at a pinned SHA as `git show <sha>:<path> | grep -c '<pattern>'`.
+     at a pinned SHA as `git grep -c '<pattern>' <sha> -- <paths>`.
    - A `results.txt ===== Qn =====` marker: split by marker with a scratchpad script and read
      that section.
-   - A web quote: `bash .claude/scripts/verify-quote.sh <url> "<quote>"`, and `WebFetch` the
-     cited URL for its context or version.
+   - A web quote: `bash .claude/scripts/verify-quote.sh <url> '<quote>'`, and `WebFetch` the
+     cited URL for its context or version. Single-quote the quote, write an apostrophe in it
+     as `'\''`, and drop its backticks (the script normalises them away on both sides): a
+     double-quoted `$`, backtick or `"` expands or breaks the command, and its `NO MATCH` would
+     be a false verdict.
    - A settled-item dispute: the related spec's Decisions table under `.claude/specs/` and
      `git log` (`research-discipline.md` § 5: if a decision contradicts the commits, the
      commits win).
@@ -59,10 +63,11 @@ for nothing else.
    - The critic's trigger holds: the evidence does not say what the claim says, or the
      alternative is consistent with all of it and the run never tested it, and the claimed
      consequence for Answer or Next follows → `UPHELD`, with the surviving `trigger` and a
-     severity you can defend on the research scale.
-   - The pin, marker, quote or ledger row supports the claim as written (or `findings.md` as
-     it now stands closes the finding), and you can cite it → `REFUTED`, with that
-     `refutation`.
+     severity you can defend on the research scale. When `findings.md` already corrects the
+     claim, the ruling is still `UPHELD` and `summary` says so: the critic's re-check of the
+     lead's `FIX` then ends it `FIXED`.
+   - The pin, marker, quote or ledger row supports the claim as written, and you can cite it
+     → `REFUTED`, with that `refutation`.
    - The answer depends on something no artefact of the run holds (a capture nobody ran, prod
      state, product intent) → `OUTSIDE_RUN`, with the **one** `question` the owner must
      answer. A ruling of `OUTSIDE_RUN` without a `question:` is not a ruling.
@@ -81,10 +86,11 @@ Do not split the difference. A `major` that is really a `blocker` is a wrong rul
 
 - No `findings.md`, case-file or repo edits. No `Edit`, no `Write`, no heredoc or redirect
   outside your scratchpad subfolder.
-- Bash: read-only git as `guides/adversarial-review.md` § Tool boundaries lists it; `node` /
-  `python3 -I` on a script under your scratchpad subfolder, which never writes to the repo,
-  builds, installs or uses the network; the gate's read-only filters; and
-  `bash .claude/scripts/verify-quote.sh <url> "<quote>"`, exactly those two arguments.
+- Bash: read-only git as `guides/adversarial-review.md` § Tool boundaries lists it, and
+  `git grep` at a pinned SHA; `node` / `python3 -I` on a script under your scratchpad
+  subfolder, which never writes to the repo, builds, installs or uses the network; the gate's
+  read-only filters; and `bash .claude/scripts/verify-quote.sh <url> '<quote>'`, exactly those
+  two arguments.
 - No new evidence: no web search, no `WebFetch` of a URL the run does not cite.
 - No dispatching, no messaging, no asking for the rest of the debate or the case file.
 - Never read or grep the never-read list: `<folder>/critique*.md`, every investigation folder
