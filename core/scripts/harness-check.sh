@@ -1079,6 +1079,38 @@ grep -qF 'context is at risk' "$WF" && ok "ai-workflow.md: the lead stops with t
 for a in coder tester reviewer planner; do for tok in is_decision applies_to question_id; do grep -qF "$tok" "$H/agents/$a.md" && ok "$a mentions $tok" || fail "$a never mentions $tok (shape not pinned)"; done; done
 if [ "$H" = "$ROOT/core" ]; then grep -qF 'minted' "$ROOT/docs/2026-10-22-team-flow-design.md" && ok "team-flow design records the minted-decision incident" || fail "team-flow design lacks the minted-decision incident"; fi
 
+echo "== 5h. Thoroughness knobs (2026-10-27) =="
+# guides/thoroughness.md is the single home of the knob table, presets, shared flags and angles;
+# commands and agents point at it by section and never repeat a number.
+TH="$H/guides/thoroughness.md"
+check "guides/thoroughness.md exists" test -f "$TH"
+for hd in "## Knob table" "## Width semantics" "## Presets" "## Input" "## Angles" "## Delta and probed" "## Agent ceiling" "## Counting"; do
+  grep -qxF "$hd" "$TH" 2>/dev/null && ok "thoroughness.md has '$hd'" || fail "thoroughness.md lacks '$hd'"
+done
+KT=$(sed -n '/^## Knob table$/,/^## /p' "$TH" 2>/dev/null)
+trim_cell() { awk -F'|' -v c="$1" 'NR==1{v=$c; gsub(/^[ \t]+|[ \t]+$/,"",v); print v; exit}'; }
+for f in "$H"/agents/*.md; do
+  a=$(basename "$f" .md); row=$(printf '%s\n' "$KT" | grep -E '^\| `'"$a"'`')
+  n=$(printf '%s\n' "$KT" | grep -cE '^\| `'"$a"'`')
+  [ "$n" = 1 ] && ok "knob table has exactly one row for $a" || { fail "knob table has $n rows for $a (wants exactly 1)"; continue; }
+  w="$(printf '%s\n' "$row" | trim_cell 3) $(printf '%s\n' "$row" | trim_cell 4) $(printf '%s\n' "$row" | trim_cell 5)"
+  r=$(printf '%s\n' "$row" | trim_cell 6)
+  { printf '%s\n' "$w" | grep -qxE '[1-8] [1-8] [1-8]' || { [ -n "$r" ] && [ "$r" != "—" ]; }; } \
+    && ok "knob row $a is a width (1–8) or carries a reason" || fail "knob row $a is neither a width 1–8 nor a reason"
+done
+for a in research-lead incident-investigator repro-driver designer coder tester reviewer planner; do
+  r=$(printf '%s\n' "$KT" | grep -E '^\| `'"$a"'`' | trim_cell 6)
+  [ -n "$r" ] && [ "$r" != "—" ] && ok "singleton $a carries its reason" || fail "singleton $a has no reason in the knob table"
+done
+for tok in quick standard thorough exhaustive --effort --width --dry --max-agents 8 warn cycle hunter-H time-and-config claims-and-consumers probed "tried:" "agent ceiling" "counts once toward" "git ls-files --others" "--effort=quick" '"max_agents": 48' '"width": {"searcher": 2}'; do
+  grep -qF -- "$tok" "$TH" 2>/dev/null && ok "thoroughness.md mentions $tok" || fail "thoroughness.md never mentions $tok"
+done
+grep -qF 'A round of parallel briefs to one teammate type counts once toward `--max-iter`; the width is the number of agents in that round.' "$TH" 2>/dev/null \
+  && ok "thoroughness.md § Counting holds the counting sentence verbatim" || fail "thoroughness.md lacks the counting sentence verbatim"
+sed -n '/^## Delta and probed$/,/^## /p' "$TH" 2>/dev/null | grep -qF 'git ls-files --others' \
+  && ok "thoroughness.md § Delta counts untracked files (git ls-files --others)" || fail "thoroughness.md § Delta ignores untracked files"
+grep -qF 'thoroughness.md' "$H/CLAUDE.md" && ok "CLAUDE.md § Guides lists thoroughness.md" || fail "CLAUDE.md § Guides does not list thoroughness.md"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
