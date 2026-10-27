@@ -1134,8 +1134,28 @@ sed -n '/^## Case file/,/^## Tool boundaries/p' "$AR" 2>/dev/null | grep -qF 'dr
   && ok "adversarial-review.md state block has dry_rounds:" || fail "adversarial-review.md state block lacks dry_rounds:"
 sed -n '/^### The loop/,/^### Report/p' "$AR" 2>/dev/null | grep -qF 'git ls-files --others' \
   && ok "adversarial-review.md § The loop computes the delta over untracked files" || fail "adversarial-review.md § The loop delta ignores untracked files"
-grep -qF 'Dispatch two `adversarial-reviewer`' "$AR" 2>/dev/null \
+grep -qE 'Dispatch (two|2) `adversarial-reviewer`' "$AR" 2>/dev/null \
   && fail "adversarial-review.md still dispatches a fixed two hunters (fixed width)" || ok "adversarial-review.md dispatches the resolved hunter width"
+NWAY=$(sed -n '/^- \*\*N-way cross-examination/,/^- \*\*Burden of proof/p' "$AR" 2>/dev/null)
+for tok in lowest same_as "no majority \`VALID\` or \`FALSE_POSITIVE\`"; do
+  printf '%s\n' "$NWAY" | grep -qF -- "$tok" && ok "adversarial-review.md N-way bullet: $tok" || fail "adversarial-review.md N-way bullet lacks $tok"
+done
+printf '%s\n' "$NWAY" | grep -qF 'CONTESTED` for a `minor' \
+  && fail "adversarial-review.md N-way bullet: no majority on a minor/nit skips the asserter's turn" || ok "adversarial-review.md N-way bullet: no majority on a minor/nit gets the asserter's turn"
+LOOP=$(sed -n '/^### The loop/,/^### Report/p' "$AR" 2>/dev/null)
+for tok in 'never increment `review_iter`' '`--no-fix` keeps them' 'nobody probed' '.claude/runs/' 'core.quotePath=false' '*Coder could not act* trips regardless'; do
+  printf '%s\n' "$LOOP" | grep -qF -- "$tok" && ok "adversarial-review.md § The loop: $tok" || fail "adversarial-review.md § The loop lacks: $tok"
+done
+sed -n '/^## Procedure/,/^### Before/p' "$AR" 2>/dev/null | grep -qF 'A round of parallel briefs to one teammate type counts once toward `--max-iter`; the width is the number of agents in that round.' \
+  && ok "adversarial-review.md § Procedure opens with the counting sentence" || fail "adversarial-review.md § Procedure lacks the counting sentence"
+for tok in 'dry_streak:' 'dispatched:' 'round_kind:'; do
+  sed -n '/^## Case file/,/^## Tool boundaries/p' "$AR" 2>/dev/null | grep -qF -- "$tok" && ok "adversarial-review.md state block has $tok" || fail "adversarial-review.md state block lacks $tok"
+done
+sed -n '/^## Delta and probed$/,/^## /p' "$TH" 2>/dev/null | grep -qF 'nobody probed' \
+  && ok "thoroughness.md § Delta: an uncovered delta file blocks APPROVED" || fail "thoroughness.md § Delta: no consequence for an uncovered delta file"
+sed -n '/^Consumers:/,/^$/p' "$TH" 2>/dev/null | grep -qF 'adversarial-reviewer' && ok "thoroughness.md consumers list adversarial-reviewer" || fail "thoroughness.md consumers omit adversarial-reviewer"
+grep -qF 'reads § Angles for its bucket order' "$TH" 2>/dev/null && ok "thoroughness.md: hunters and critics read § Angles" || fail "thoroughness.md forbids the hunter reading § Angles"
+grep -F '[thoroughness.md]' "$H/CLAUDE.md" | grep -qF 'adversarial-reviewer' && ok "CLAUDE.md thoroughness row lists adversarial-reviewer" || fail "CLAUDE.md thoroughness row omits adversarial-reviewer"
 for tok in time-and-config claims-and-consumers hunter-H probed cycle; do
   grep -qF -- "$tok" "$HUNTER" 2>/dev/null && ok "adversarial-reviewer mentions $tok" || fail "adversarial-reviewer never mentions $tok"
 done

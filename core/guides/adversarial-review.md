@@ -194,8 +194,9 @@ is a `major` until someone reads or runs the missing piece.
     step 2 for a re-graded severity).
   - **Majority `FALSE_POSITIVE`** → turns (`blocker`/`major`) or the asserter's one turn
     (`minor`/`nit`).
-  - **No majority** (an `UNCLEAR` split, or a tie at even `N−1`) → turns as if challenged for a
-    `blocker`/`major`; `CONTESTED` for a `minor`/`nit` (§ Ladder scope).
+  - **No majority** (no majority `VALID` or `FALSE_POSITIVE`: most rulings `UNCLEAR`, a split, or
+    a tie at even `N−1`) → as if challenged: turns (`blocker`/`major`) or the asserter's one turn
+    (`minor`/`nit`).
   - **Turns are two-sided**: between the asserter and the **designated challenger**, the lowest
     hunter letter among those who ruled `FALSE_POSITIVE`, else the lowest among those who ruled
     `UNCLEAR`. The other rulings on the finding are attached verbatim to the first turn message
@@ -203,8 +204,9 @@ is a `major` until someone reads or runs the missing piece.
     "both sides" or "both hunters" about one finding, it means the asserter and its designated
     challenger, and the judge gets those two positions.
 
-  At `N = 2` each finding has one ruling, its author is the designated challenger, and this is
-  the two-hunter protocol unchanged.
+  At `N = 2` each finding has one ruling and its author is the designated challenger: the
+  two-hunter protocol, except that an `UNCLEAR` on a `minor`/`nit` now gets the asserter's one
+  turn before it is `CONTESTED`.
 - **Burden of proof sits with the asserter.** A finding whose trigger does not survive the
   challenge is `WITHDRAWN`. "It could still happen somehow" is not a trigger.
 - **Evidence gate.** Every turn on a finding carries `new_evidence:` — new cited lines, a
@@ -224,8 +226,8 @@ is a `major` until someone reads or runs the missing piece.
   sides say it, the finding is `ESCALATED` with that question; no judge.
 - **Ladder scope.** Everything past one cross-examination (further turns, the judge, the fix
   dispatch) is for `blocker` and `major` only. A `minor`/`nit` that is `VALID` after
-  cross-examination is `AGREED`; `FALSE_POSITIVE` and conceded is `WITHDRAWN`; anything else is
-  `CONTESTED` and reported as such.
+  cross-examination is `AGREED`; `FALSE_POSITIVE` (or no majority, § N-way cross-examination)
+  and conceded is `WITHDRAWN`; anything else is `CONTESTED` and reported as such.
 - **Severity reconciliation.** `AGREED` takes the stricter severity unless a re-grade was
   explicitly accepted in a turn.
 - **Judge ladder** (per `blocker`/`major` finding with both sides exhausted and no shared
@@ -412,7 +414,10 @@ payload:
 
 "The judge ruled on <id>: <judge block verbatim>. One turn: ACCEPT, or CHALLENGE with new
 evidence." The reply is a turn reply. Coder's `not_applicable` entries go through the same
-message with Coder's reason in place of a hunter's turn.
+message with Coder's reason in place of a hunter's turn; a finding Coder rejects usually has no
+designated challenger, so that message goes to the asserter, plus the lowest-letter `VALID`
+ruler on the finding (else its designated challenger) as the hunters' second voice. At `N = 2`
+that is both hunters, as before.
 
 ### Coder, findings-only mode (orchestrator → coder)
 
@@ -446,9 +451,10 @@ judge and Coder dispatch counts once toward `max_agents` (`thoroughness.md § Co
 1. Parse arguments (the command's § Input). Run the branch gate when fixes are on.
 2. Resolve the diff base as [`reviewer.md`](../agents/reviewer.md) § Procedure step 1 does, and
    take `git diff <base>` plus `git status`. Empty: final block `NO_DIFF`, nothing written.
-3. Create the case file (§ Case file) with `review_iter: 0`, `dry_rounds: 0`, the resolved
-   `knobs:` (`thoroughness.md § Input`) and the `tree` hash. Take round 1's snapshot (§ The
-   loop step 5); round 1 carries `delta: none`.
+3. Create the case file (§ Case file) with `review_iter: 0`, `round_kind: fix`,
+   `dry_rounds: 0`, `dry_streak: 0`, `dispatched: 0`, the resolved `knobs:`
+   (`thoroughness.md § Input`) and the `tree` hash. Take round 1's snapshot (§ The loop step 5);
+   round 1 carries `delta: none`.
 
 ### A round
 
@@ -460,23 +466,25 @@ judge and Coder dispatch counts once toward `max_agents` (`thoroughness.md § Co
    **Probe check** (`thoroughness.md § Delta and probed`), before cross-examination: a hunt
    reply that lacks a `probed` entry for a delta file it has no finding on gets the probe
    send-back message once (§ Message shapes); append its reply. A reply still missing entries
-   goes on to cross-examination with those files uncovered by that hunter. A `CLEAN` one is
-   recorded `CLEAN (unprobed: <files>)` in the synthesis, does not count as `CLEAN` for the exit
-   check, and the recap lists its files.
+   goes on to cross-examination with those files unprobed by that hunter. A `CLEAN` one is
+   recorded `CLEAN (unprobed: <files>)` in the synthesis, not `CLEAN`. A delta file no hunter
+   covered blocks `APPROVED` (§ The loop step 2, Uncovered delta).
 2. **Cross-examine.** Send each hunter the other hunters' findings, grouped by hunter (by agent
    id). Append every reply. Tally each finding's rulings by § Debate rules, N-way
    cross-examination. A finding a majority rules `VALID`, every such ruling at the asserter's
    own severity, is `AGREED` at once, no turn needed. A majority `VALID` with a re-graded
    severity among its votes goes to the asserter for one turn:
-   `CLARIFY` carrying the re-graded severity accepts it (`AGREED` at the new severity);
+   `CLARIFY` carrying the re-graded severity accepts it (`AGREED` at the new severity; when
+   re-graders disagree, the lowest-letter re-grader's severity is the one that counts);
    `MAINTAIN` with evidence keeps it open like any other finding, its designated challenger the
    lowest letter among the re-graders. Findings a hunter `added` enter the open set like hunt
    findings: every other hunter rules on them with a `RULINGS` block in its next reply, beside
-   its `TURN` block when it has one, and they are tallied the same way. Rulings with `same_as`
+   its `TURN` block when it has one; a hunter with no open turns gets them in a cross-examination
+   message, reused for that. They are tallied the same way. Rulings with `same_as`
    are merged at synthesis (§ Debate rules, Duplicates).
-3. **Resolve `minor`/`nit`.** Majority `VALID` → `AGREED`; majority `FALSE_POSITIVE` → one turn
-   to the asserter; `CONCEDE` → `WITHDRAWN`, otherwise `CONTESTED`; no majority → `CONTESTED`.
-   These never go further.
+3. **Resolve `minor`/`nit`.** Majority `VALID` → `AGREED`; majority `FALSE_POSITIVE` or no
+   majority → one turn to the asserter; `CONCEDE` → `WITHDRAWN`, otherwise `CONTESTED`. These
+   never go further.
 4. **Turns until resolved** on every open `blocker`/`major`: alternate turn messages between the
    asserter and its designated challenger, each carrying only still-open findings. After every
    reply apply the Debate rules: `CONCEDE` → `WITHDRAWN`; `ACCEPT` → `AGREED` (severity
@@ -490,9 +498,9 @@ judge and Coder dispatch counts once toward `max_agents` (`thoroughness.md § Co
    turn: `ACCEPT` → resolved per the ruling; a second `CHALLENGE` → `STALEMATE`, no content
    check.
 6. **Synthesis** (orchestrator). Write the round's synthesis table into the case file: every
-   finding, its end state, its severity, and the chain of message references. A dry-check
-   round's synthesis ends with `dry: yes` or `dry: no (<new ids>)` (§ The loop step 2). Rewrite
-   the state block.
+   finding, its end state, its severity, and the chain of message references; then
+   `uncovered: [<files>]` when a delta file was uncovered (§ The loop step 2). Rewrite the state
+   block.
 7. **Owner pause.** With `ESCALATED` findings and `--auto` off, ask the questions now with
    `AskUserQuestion`, one question per finding. An answer that settles the finding changes its
    state to `AGREED` (fixed this round) or `WITHDRAWN`; record the answer in the case file. With
@@ -510,69 +518,95 @@ judge and Coder dispatch counts once toward `max_agents` (`thoroughness.md § Co
      second time. A rejection the judge refuted is Coder being right, never a stall.
    - *Fix churn*: for two rounds running, every `AGREED` finding sits in a file the previous
      round's Coder `changed_files` lists.
-   Tripped → final status `STALLED`, naming the condition and the repeated findings. A round
-   with no `AGREED` `blocker`/`major` never trips it.
+   Tripped → final status `STALLED`, naming the condition and the repeated findings. *Fix did
+   not take* and *Fix churn* never trip on a round with no `AGREED` `blocker`/`major` (both are
+   vacuously true on an empty set); *Coder could not act* trips regardless.
 2. **Exit before fixing.** `ESCALATED` and `STALEMATE` items **carry over** from earlier rounds
    until the owner answers them: a question nobody answered is still open, whatever the current
    round's hunters found. No `AGREED` `blocker`/`major` and nothing `ESCALATED`/`STALEMATE` at
    `blocker`/`major` in any round → `APPROVED`. No `AGREED` `blocker`/`major` but some `ESCALATED`/`STALEMATE`
    at that severity → `NEEDS_OWNER`. `AGREED` `blocker`/`major` with `--no-fix` → `REVIEWED`.
    `review_iter` at the cap → `REVIEW_LIMIT_REACHED`.
+   **Uncovered delta** (`thoroughness.md § Delta and probed`), checked before the dry check. A delta
+   file is uncovered when no hunter of the round has a finding on it or a `probed` entry for it. A
+   round with an uncovered delta file cannot exit `APPROVED`. Instead the orchestrator dispatches
+   one more dry-check round, a **probe round** (`round_kind: probe`), whose capsule names the
+   uncovered files as its delta; it runs at any `K`, does not count toward `2K`, never increments
+   `review_iter`, and leaves `dry_streak` unchanged when it is dry. A file still uncovered after it,
+   in a round that would otherwise exit `APPROVED`, ends the review `NEEDS_OWNER` with one owner
+   question per file: "nobody probed <file> after the fix; review it by hand".
    **Dry check** (`thoroughness.md § Dry rounds`). With `K > 0` (`knobs.dry`), a round whose exit
-   would be `APPROVED` starts a **dry-check round** instead: fresh hunters, same tree,
-   `delta: none`, no Coder, angles rotated (`thoroughness.md § Angles`). A finding is new when it
-   is not a duplicate of any earlier round's finding (step 1's sameness rule, at any severity)
+   would be `APPROVED` starts a **dry-check round** instead (`round_kind: dry`): fresh hunters, same
+   tree, `delta: none`, no Coder, angles rotated (`thoroughness.md § Angles`). `dry_rounds` is
+   incremented when a `round_kind: dry` round is dispatched, before its hunt. A finding is new when
+   it is not a duplicate of any earlier round's finding (step 1's sameness rule, at any severity)
    and it **survives its cross-examination** (any end state but `WITHDRAWN` or `REFUTED`). A
-   dry-check round with no new finding is dry. A new finding resets the dry counter; a new
-   `AGREED` `blocker`/`major` re-enters the fix loop (step 3; `REVIEWED` with `--no-fix`). `K`
-   consecutive dry rounds (the trailing `dry: yes` syntheses), or `dry_rounds` reaching its hard
-   cap `2K`, → `APPROVED`; at the cap the recap says the dry loop was **cut at its cap**, not
-   dry. Dry-check rounds never increment `review_iter`; each one increments `dry_rounds`.
-   `--no-fix` keeps them.
+   dry-check round with no new finding is dry and increments `dry_streak`. A new finding in any
+   round resets `dry_streak` to 0; a new `AGREED` `blocker`/`major` re-enters the fix loop (step 3;
+   `REVIEWED` with `--no-fix`). `dry_streak` reaching `K` → `APPROVED`, ended dry. Otherwise, with
+   `dry_rounds` already at its hard cap `2K`, no further dry-check round is dispatched → `APPROVED`,
+   and the recap says the dry loop was **cut at its cap**.
+   Dry-check rounds never increment `review_iter`. `--no-fix` keeps them.
 3. **Fix dispatch.** `review_iter++`. Dispatch `coder` with the findings-only message carrying
    every `AGREED` `blocker`/`major` finding. Append its block. `BLOCKED` → final `BLOCKED`.
 4. **Coder rejections**, evaluated **before the breaker** and before the next round. Every
    `not_applicable` entry goes up the judge ladder now: a fresh judge with Coder's reason as one
-   position and the hunters' final position as the other; the judge-ruling message to the
-   hunters; the ladder as in step 5 of the round. A refuted finding is `REFUTED` and leaves the
-   `AGREED` set. An upheld finding goes back to Coder **in this round** (`review_iter++`); an
-   upheld finding Coder rejects a second time trips the breaker. When every rejection was
-   refuted and nothing else was sent, the round has no `AGREED` `blocker`/`major` left: go to
-   the exit check, not to a new round.
+   position and the hunters' final position as the other; the judge-ruling message to the asserter,
+   plus the lowest-letter `VALID` ruler (else the designated challenger) as the hunters' second
+   voice (at `N = 2`: both hunters, as before); the ladder as in step 5 of the round. A refuted
+   finding is `REFUTED` and leaves the `AGREED` set. An upheld finding goes back to Coder **in this
+   round** (`review_iter++`); an upheld finding Coder rejects a second time trips the breaker. When
+   every rejection was refuted and nothing else was sent, the round has no `AGREED`
+   `blocker`/`major` left: go to the exit check, not to a new round.
 5. **Next round.** Rewrite the state block (`tree` from the new diff). Take this round's
    snapshot and compute the delta (`thoroughness.md § Delta and probed`) against the previous
-   round's: every round takes one, a dry-check round included. `D` is `<scratchpad>/adv-r<N>/`
-   for the round about to start, `P` the previous round's, `BASE` the state block's `base`:
+   round's: every round takes one, dry-check and probe rounds included. Snapshots live next to
+   the case file, never in the session scratchpad, so a resume finds them: `D` is
+   `<repo root>/.claude/runs/<case-file stem>/r<N>` for the round about to start, `P` the
+   previous round's, `BASE` the state block's `base`. Hunters never read `.claude/runs/`.
 
    ```bash
-   cd "$(git rev-parse --show-toplevel)" && mkdir -p "$D"
+   cd "$(git rev-parse --show-toplevel)" && mkdir -p "$D/files"
    git diff "$BASE" -- . ':!.claude' > "$D/diff.patch"
-   git diff --name-only "$BASE" -- . ':!.claude' | while IFS= read -r f; do
-     printf '%s  %s\n' "$(git diff "$BASE" -- "$f" | sha256sum | cut -c1-64)" "$f"
-   done > "$D/tracked.sha256"
+   git -c core.quotePath=false diff --name-only -z "$BASE" -- . ':!.claude' \
+     | while IFS= read -r -d '' f; do
+         mkdir -p "$D/files/$(dirname -- "$f")"
+         git diff "$BASE" -- "$f" > "$D/files/$f.patch"
+       done
+   (cd "$D/files" && find . -type f -name '*.patch' -print0 | sort -z | xargs -0 -r sha256sum) \
+     > "$D/tracked.sha256"
    git ls-files --others --exclude-standard -z -- . ':!.claude' | sort -z \
      | xargs -0 -r sha256sum > "$D/untracked.sha256"
-   { diff "$P/tracked.sha256" "$D/tracked.sha256" | sed -n 's/^[<>] [0-9a-f]\{64\}  //p'
+   ```
+
+   When the round follows a fix, the delta paths are:
+
+   ```bash
+   { diff "$P/tracked.sha256" "$D/tracked.sha256" \
+       | sed -n 's/^[<>] [0-9a-f]\{64\}  \.\/\(.*\)\.patch$/\1/p'
      diff "$P/untracked.sha256" "$D/untracked.sha256" | sed -n 's/^> [0-9a-f]\{64\}  //p'
    } | sort -u
    ```
 
-   The last command prints the delta paths; run it only when the round follows a fix (round 1
-   and a dry-check round carry `delta: none`). The delta files are those paths plus Coder's
-   `changed_files`. Its hunks: for a tracked file,
-   what `diff` reports between its sections of `$P/diff.patch` and `$D/diff.patch`; an untracked
-   file new or changed since the previous round is a whole-file delta (its path). Start a new
-   round with `knobs.width.adversarial-reviewer` **fresh** hunters and the delta in their
+   The delta files are those paths plus Coder's `changed_files`. The hunks of a tracked delta
+   file `f` are `diff "$P/files/$f.patch" "$D/files/$f.patch"` (`/dev/null` for a side that does
+   not exist); an untracked file new or changed since the previous round is a whole-file delta
+   (its path). Round 1 and a dry-check round carry `delta: none`; a probe round carries the
+   uncovered files. When `P` is missing (a resume in a fresh session, a deleted folder), take
+   this round's snapshot, treat the whole diff as the delta, and say so in the case file. Start
+   a new round with `knobs.width.adversarial-reviewer` **fresh** hunters and the delta in their
    capsule. The previous round's findings are never sent to them; the case file keeps them for
    the breaker.
 
-**Agent ceiling** (`thoroughness.md § Agent ceiling`). A dispatch that does not fit `max_agents`
-is not started; a round's hunters fit or wait together. Reaching `max_agents` mid-round, finish
-the round with resumes (`SendMessage` is free): a judge that can no longer be dispatched leaves
-its finding `STALEMATE` with `reason: agent ceiling`; then the exit check runs. Coder goes out
-only when Coder and the next round both fit. When the exit check calls for a round that does not
-fit, the last exit check decides: a round that would verify a fix → `REVIEW_LIMIT_REACHED`; a
-dry-check round → `APPROVED`, and the recap says the dry loop was cut at the agent ceiling.
+**Agent ceiling** (`thoroughness.md § Agent ceiling`). A dispatch of `n` agents fits when
+`dispatched + n ≤ max_agents` (`dispatched` from the state block, incremented at every fresh
+dispatch); one that does not fit is not started, and nothing is dispatched partially. Reaching
+`max_agents` mid-round, finish the round with resumes (`SendMessage` is free): a judge that can
+no longer be dispatched leaves its finding `STALEMATE` with `reason: agent ceiling`; then the
+exit check runs. Coder goes out only when Coder and the next round both fit. When the exit check
+calls for a round that does not fit, the last exit check decides: a round that would verify a
+fix → `REVIEW_LIMIT_REACHED`; a dry-check round → `APPROVED`, and the recap says the dry loop
+was cut at the agent ceiling; a probe round → `NEEDS_OWNER` with its uncovered-file questions.
 
 ### Report
 
@@ -594,9 +628,12 @@ about $X": `M` is the bound on rounds from `thoroughness.md § Dry rounds`, `W` 
 `--resume [<case-file>]`: read the state block of the given file, else the newest
 `.claude/runs/*-adversarial-*.md`. Recompute `tree`. If it differs, say so and restart the
 current round on the new tree. Either way, start the current round again with **fresh** hunters
-from the recorded `review_iter`, `dry_rounds` and `knobs` (never re-resolved) and the recorded
-states of earlier rounds. Mid-round debate state
-is never restored. The abandoned attempt's findings stay in the state block with
+from the recorded `round_kind`, `review_iter`, `dry_rounds`, `dry_streak`, `dispatched` and
+`knobs` and the recorded states of earlier rounds; nothing but `tree` is recomputed (`knobs` is
+never re-resolved). A restarted dry-check round was counted in `dry_rounds` when first
+dispatched and is not counted again; a restarted probe round takes its delta from the previous
+round's `uncovered:` line; a missing snapshot is handled as in § The loop step 5. Mid-round
+debate state is never restored. The abandoned attempt's findings stay in the state block with
 `state: SUPERSEDED` and their ids; the restart's ids get the next letter suffix (`r3b-`, `r3c-`),
 so nothing in the case file is overwritten. When fixes are on, the branch gate runs again before
 any fix dispatch.
@@ -613,7 +650,10 @@ The first fenced block is the state block, rewritten at every round boundary:
 ```yaml
 state:
   review_iter: 0
-  dry_rounds: 0                                 # dry-check rounds run so far (cap 2K)
+  round_kind: fix                               # fix (round 1, after a fix) | dry | probe
+  dry_rounds: 0                                 # dry-check rounds dispatched (cap 2K)
+  dry_streak: 0                                 # consecutive dry rounds so far
+  dispatched: 0                                 # agent dispatches so far (§ The loop, ceiling)
   knobs: {…}                                    # resolved once (thoroughness.md § Input)
   base: <resolved sha>
   tree: <sha256 over `git diff <base>` followed by every untracked, non-ignored file (see below)>
@@ -641,8 +681,9 @@ tree change (measured 2026-10-22).
 Then, per round, verbatim appends under `## Round N` (a dry-check round is a round too):
 `### Hunt <letter>` per hunter (`### Hunt A`, `### Hunt B`, …, with its probe send-back reply),
 `### Cross-examination <letter> on <the other letters>` per hunter (`### Cross-examination A on
-B`, `### Cross-examination B on A` at width 2), `### Exchange k` (both turn
-replies), `### Judge <finding id>` (capsule summary, ruling, the hunters' turns, the reply),
+B`, `### Cross-examination B on A` at width 2), `### Exchange k` (the asserter's and the
+designated challenger's turn replies), `### Judge <finding id>` (capsule summary, ruling, the
+hunters' turns, the reply),
 `### Synthesis` (the table), `### Owner` (questions and answers), `### Coder` (its block). Every
 block is appended as the agent wrote it.
 

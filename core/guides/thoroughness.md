@@ -11,13 +11,15 @@ How wide and how deep a run goes, chosen per run. Four knobs:
 - **Effort presets** set every knob at once, under an **agent ceiling** (`--max-agents`) on the
   dispatches of one run (§ Presets, § Agent ceiling).
 
-Consumers: `/adversarial-review`, `/feature-flow`, `/research`, `research-lead`. Design:
+Consumers: `/adversarial-review`, `/feature-flow`, `/research`, `research-lead`,
+`adversarial-reviewer` and `research-critic` (§ Angles only). Design:
 `docs/2026-10-27-thoroughness-knobs-design.md` in the harness repo.
 
 **Resolution happens once in the main session; a subagent receives numbers.** The command
 resolves the knobs (§ Input), writes them into the case file's state block or the run-log
-header, and passes them in every capsule. A subagent never reads this guide's tables or
-`project.md` to size itself: it counts against the numbers in its capsule.
+header, and passes them in every capsule. A subagent never reads this guide or `project.md` to
+size itself; a hunter or critic reads § Angles for its bucket order. It counts against the
+numbers in its capsule.
 
 **`standard` is today's size.** A run with no flag and no `project.md` key behaves exactly as it
 did before this guide: two hunters per round, one gatherer per brief, `K = 0`.
@@ -277,8 +279,14 @@ probed:
 - A `CLEAN` hunt reply in a round with a delta requires a `probed[]` entry for every delta
   file. A `CLEAN` reply still missing entries after the send-back does not count as `CLEAN` for
   the exit check: it is recorded as `CLEAN (unprobed: <files>)` and treated as a hunt that found
-  nothing on the rest of the diff, with the delta files uncovered. The recap lists every
+  nothing on the rest of the diff, with the delta files unprobed by it. The recap lists every
   uncovered delta file.
+- **A round with an uncovered delta file cannot exit `APPROVED`.** A delta file is uncovered
+  when no hunter of the round has a finding on it or a `probed[]` entry for it. The
+  orchestrator dispatches one more dry-check round whose capsule names the uncovered files as
+  its delta; that round does not count toward `2K` and never increments `review_iter`. A file
+  still uncovered after it ends the review `NEEDS_OWNER` with one question per file:
+  "nobody probed <file> after the fix; review it by hand". No new status token.
 
 This is `research-discipline.md` § 3 applied to a review: a null needs proof the probe ran.
 
