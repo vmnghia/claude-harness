@@ -1,6 +1,6 @@
 ---
 description: Research team — frame a question with the owner inline, then the research-lead subagent runs the team and writes findings.md
-argument-hint: <question | FRONT-XXXX> [--max-iter=N] | --resume <investigation-folder>
+argument-hint: "<question | FRONT-XXXX> [--max-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] | --resume <investigation-folder>"
 ---
 
 Contract: [`.claude/guides/research-workflow.md`](../guides/research-workflow.md). This command
@@ -11,10 +11,15 @@ only selects where each phase runs; the procedure lives in
 
 Raw arguments: `$ARGUMENTS`.
 
-- Empty → stop. Reply only: `Usage: /research <question | FRONT-XXXX> [--max-iter=N] | --resume <investigation-folder>`. Create nothing.
+- Empty → stop. Reply only: `Usage: /research <question | FRONT-XXXX> [--max-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] | --resume <investigation-folder>`. Create nothing.
 - Then, if `.claude/agents/research-lead.md` still contains the line starting `> **STUB (`,
   stop. Reply only: `research-lead is still a stub (procedure not written, work item #1); /research can't run yet.` Create nothing.
-- `--max-iter=N` → N must be a positive integer; otherwise warn `--max-iter ignored, using 3` and use 3. Default 3.
+- `--max-iter=N` → N must be a positive integer; otherwise warn `--max-iter ignored, using 3` and use 3. Default 3 (the preset does not drive it:
+  `guides/thoroughness.md § Presets`).
+- Thoroughness flags (`--effort`, `--width`, `--dry`, `--max-agents`) → parse and validate per
+  [`guides/thoroughness.md`](../guides/thoroughness.md) § Input. Resolve the knobs once, pass
+  `knobs:` and `max_agents` in the lead's capsule (New run step 3), and record them in
+  `lead.txt`, so `--resume` reuses them.
 - `--resume <folder>` → go to **Resume**.
 
 ## New run
@@ -25,9 +30,11 @@ Raw arguments: `$ARGUMENTS`.
 2. **Frame.** Execute research-lead.md § "Framing" **inline in this session**. It creates
    `findings.md` from the template (frontmatter, question, dispatch plan).
 3. **Dispatch.** Agent tool, `subagent_type: "research-lead"`, with: the folder path, the
-   framing, `--max-iter`, and a context capsule (`guides/ai-workflow.md` template). Then write
-   `lead.txt` in the folder: `lead_agent_id: <id from the Agent result>`. This is the main
-   session's only file in the folder; `run-log.md` belongs to the lead.
+   framing, `--max-iter`, `knobs:` and `max_agents` (the whole ceiling), and a context capsule
+   (`guides/ai-workflow.md` template). Then write `lead.txt` in the folder:
+   `lead_agent_id: <id from the Agent result>`, followed by the resolved `knobs:` and
+   `max_agents:` lines for that agent id (Resume reuses them, never re-resolves). This is the
+   main session's only file in the folder; `run-log.md` belongs to the lead.
 4. **Wait.** Do not end this turn while the lead is outstanding. Never read its transcript file.
    If the lead's task notification says `failed` on infrastructure (session limit / HTTP 429,
    API or network error), tell the owner what failed. Then say: "once it resets, run

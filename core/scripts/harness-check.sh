@@ -1162,7 +1162,7 @@ done
 
 # commands carry the shared flags (task 3); research.md joins the loop in task 4
 FF="$H/commands/feature-flow.md"
-for c in adversarial-review feature-flow; do
+for c in adversarial-review feature-flow research; do
   hint=$(grep -m1 '^argument-hint:' "$H/commands/$c.md" 2>/dev/null)
   if printf '%s\n' "$hint" | grep -qE -- '--max-iter|--max-gate-iter'; then
     printf '%s\n' "$hint" | grep -qF -- '--effort' && ok "commands/$c.md argument-hint carries --effort" || fail "commands/$c.md argument-hint lacks --effort"
@@ -1185,6 +1185,27 @@ grep -qF -- '--max-iter ignored, using 3' "$CMD" 2>/dev/null && fail "adversaria
 grep -qE 'warn and use the default' "$H/commands/feature-flow.md" 2>/dev/null && ok "feature-flow.md caps fall back to the default" || fail "feature-flow.md caps lack the fallback"
 grep -qE 'two hunters|both hunters' "$H/guides/ai-workflow.md" "$H/agents/review-judge.md" 2>/dev/null \
   && fail "ai-workflow.md / review-judge.md still say two/both hunters" || ok "ai-workflow.md / review-judge.md name no fixed hunter pair"
+
+# research on the knobs (task 4): rounds count once, partitioned width, max_agents
+RW="$H/guides/research-workflow.md"; RL="$H/agents/research-lead.md"; RC="$H/commands/research.md"
+tr '\n' ' ' < "$RW" 2>/dev/null | sed 's/  */ /g' | grep -qF 'A round of parallel briefs to one teammate type counts once toward `--max-iter`; the width is the number of agents in that round.' && ok "research-workflow.md holds the counting sentence" || fail "research-workflow.md lacks the counting sentence"
+grep -qF "dispatches 1 and 2 of the searcher's cap" "$RW" "$RL" "$TH" 2>/dev/null \
+  && fail "a file still says dispatches 1 and 2 of the searcher's cap" || ok "no 'dispatches 1 and 2' wording left"
+for tok in max_agents partition knobs round; do
+  grep -qF -- "$tok" "$RL" 2>/dev/null && ok "research-lead.md mentions $tok" || fail "research-lead.md never mentions $tok"
+done
+sed -n '/^1\. \*\*Set up/,/^2\. /p' "$RL" 2>/dev/null | grep -qF 'repro_agent_id' \
+  && ok "research-lead.md § Set up counts repro_agent_id" || fail "research-lead.md § Set up lacks repro_agent_id in the counting paragraph"
+grep -qF 'agent_id, status, round }' "$RL" 2>/dev/null && ok "research-lead.md dispatches[] carries round" || fail "research-lead.md dispatches[] lacks round"
+grep -qF 'dispatches[]` (agent, status, round)' "$RW" 2>/dev/null && ok "research-workflow.md dispatches[] carries round" || fail "research-workflow.md dispatches[] lacks round"
+grep -qF 'knobs.width' "$RW" 2>/dev/null && ok "research-workflow.md flow names knobs.width" || fail "research-workflow.md flow lacks knobs.width"
+grep -qF 'guides/thoroughness.md' "$RC" 2>/dev/null && ok "commands/research.md § Input mentions guides/thoroughness.md" || fail "commands/research.md never mentions guides/thoroughness.md"
+grep -qF 'max_agents' "$RC" 2>/dev/null && ok "commands/research.md passes max_agents" || fail "commands/research.md never mentions max_agents"
+for hint_tok in '--max-agents'; do
+  grep -m1 '^argument-hint:' "$RC" 2>/dev/null | grep -qF -- "$hint_tok" && ok "commands/research.md argument-hint carries $hint_tok" || fail "commands/research.md argument-hint lacks $hint_tok"
+done
+U=$(grep -m1 '^argument-hint:' "$RC" 2>/dev/null | sed 's/^argument-hint: //; s/^"//; s/"$//')
+grep -qF -- "Usage: /research $U" "$RC" 2>/dev/null && ok "commands/research.md usage line matches the argument-hint" || fail "commands/research.md usage line differs from the argument-hint"
 
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true

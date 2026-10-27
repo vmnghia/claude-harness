@@ -21,7 +21,7 @@ The when-to and the citation rules are in [delegation.md](../rules/delegation.md
 ## Flow and roles
 
 ```
-/research <question | FRONT-XXXX> [--max-iter=N] | --resume <investigation-folder>
+/research <question | FRONT-XXXX> [--max-iter=N] [thoroughness flags] | --resume <folder>
  ├─ 1. Frame (inline, main session; may ask the owner)
  │     procedure: research-lead.md § "Framing"
  │     → .claude/investigations/YYYY-MM-DD-<slug>/findings.md
@@ -29,7 +29,8 @@ The when-to and the citation rules are in [delegation.md](../rules/delegation.md
  │        would confirm or kill each hypothesis)
  ├─ 2. Agent(research-lead) with the framing + a context capsule
  │     procedure: research-lead.md § "Running the team"
- │       searcher · web-reader · incident-investigator   in parallel when independent
+ │       searcher · web-reader at `knobs.width`, partitioned · incident-investigator
+ │                                                        in parallel when independent
  │       designer → writer                                in sequence (copy fills canvas slots)
  │       incident-investigator → repro-driver             the only nested dispatch
  │     the lead merges every report into findings.md and writes Answer + Next
@@ -124,7 +125,7 @@ payload:
 
 | Agent | Status | Payload (core fields) |
 |---|---|---|
-| research-lead | `ANSWERED` / `PARTIAL` / `AWAITING_HUMAN` / `STOPPED` | `findings_path`, `answer` (one line), `next` (build / no-build + summary), `open[]`, `action`, `capture_path`, `dispatches[]` (agent, status, iteration), `confluence_draft` (url, content_id, version; unpublished) |
+| research-lead | `ANSWERED` / `PARTIAL` / `AWAITING_HUMAN` / `STOPPED` | `findings_path`, `answer` (one line), `next` (build / no-build + summary), `open[]`, `action`, `capture_path`, `dispatches[]` (agent, status, round), `confluence_draft` (url, content_id, version; unpublished) |
 | incident-investigator | `DIAGNOSED` / `PARTIAL` / `AWAITING_HUMAN` / `STOPPED` | `root_cause` (+ label), `fix_proposal`, `repro` (`REPRODUCED` / `NOT_REPRODUCED` / `BLOCKED` / `not_run`), `repro_agent_id`, `evidence_files[]`, `action`, `capture_path`, `findings[]` (claim, label, evidence), `open[]` (incl. LogRocket session URLs for the owner to open) |
 | repro-driver | `REPRODUCED` / `NOT_REPRODUCED` / `AWAITING_HUMAN` / `BLOCKED` | `steps_run[]`, `attempts` (e.g. `2/3`), `positive_control` (required for `NOT_REPRODUCED`), `action`, `block_reason`, `evidence[]`, `console[]`, `network[]` |
 | searcher | `FOUND` / `NOT_FOUND` / `BLOCKED` | `hits[]` (`path:line`, one-line snippet), `searches[]` (pattern, scope), `positive_control` (required for `NOT_FOUND`) |
@@ -143,20 +144,26 @@ payload:
    (measured 2026-10-14). A dispatcher must not end its turn while a teammate it dispatched is
    outstanding, and never reads a teammate's transcript file (the harness warns it overflows
    context; a mid-run transcript holds hypotheses, not findings; it bypasses the status block).
-2. **Iteration caps.** One counter per teammate (2026-10-15), starting at 0, +1 per
-   dispatch, never reset (including across a resume). Parallel briefs to the same teammate each
-   count: two searchers fanned out are dispatches 1 and 2 of the searcher's cap. Plan fan-out
-   against `--max-iter`. Default cap 3 dispatches per teammate per run;
-   `/research --max-iter=N` overrides. At the cap the lead records the gap under Open and goes
-   `PARTIAL`. `AWAITING_HUMAN` rounds are uncapped (each is gated by the owner), and a resume is
-   not a dispatch.
+2. **Rounds and the agent ceiling.** One counter per teammate (2026-10-15), starting at 0, +1
+   per **round**, never reset (including across a resume). A round is one dispatch message to
+   one teammate type, whatever its width. A round of parallel briefs to one teammate type
+   counts once toward `--max-iter`; the width is the number of agents in that round.
+   Parallel briefs within a round are partitioned per
+   [`guides/thoroughness.md § Width semantics`](thoroughness.md), never duplicated. Plan
+   rounds against `--max-iter`: default 3 rounds per teammate per run; `/research --max-iter=N`
+   overrides. At the cap the lead records the gap under Open and goes `PARTIAL`.
+   `max_agents` is a second ceiling, on dispatches: every fresh agent counts, a resume is free.
+   A round that does not fit is not started: the lead records it under Open naming the
+   ceiling, and goes `PARTIAL` only if that leaves a material Open row
+   (`guides/thoroughness.md § Agent ceiling`). `AWAITING_HUMAN` rounds are uncapped (each is
+   gated by the owner), and a resume is not a dispatch.
 3. **Routing.**
 
    | Teammate result | Lead's action |
    |---|---|
    | `FOUND` · `GATHERED` · `REPRODUCED` · `DIAGNOSED` · `CANVAS_READY` · `COPY_READY` | merge into findings.md with labels; continue |
    | `NOT_FOUND` / `NOT_REPRODUCED` with a positive control | record under "Not shown / ruled out"; continue |
-   | `NOT_FOUND` / `NOT_REPRODUCED` without one | invalid: re-dispatch asking for the control (counts as an iteration) |
+   | `NOT_FOUND` / `NOT_REPRODUCED` without one | invalid: re-dispatch asking for the control (counts as a round) |
    | `NEEDS_INPUT` | re-dispatch with the missing context, or Open + `PARTIAL` |
    | `BLOCKED` (permanent) | Open, naming who can unblock; continue other branches |
    | `STOPPED` | don't re-send the brief; re-check provenance; the lead's own third hypothesis stops the lead |
