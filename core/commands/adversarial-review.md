@@ -21,7 +21,7 @@ Raw arguments: `$ARGUMENTS`. Parse out:
 - `--base=<ref>` → the diff base. Default: resolve as `reviewer.md` § Procedure step 1 does
   (merge-base against `origin/stable`, else `origin/master`, else `master`).
 - `--max-iter=N` → the cap on `review_iter`. Must be a positive integer; otherwise warn
-  `--max-iter ignored, using 3` and use 3. Default: the preset's adversarial cap.
+  `--max-iter ignored, using <cap>` and use the preset's adversarial cap. Default: that cap.
 - Thoroughness flags (`--effort`, `--width`, `--dry`, `--max-agents`) → parse and validate per
   [`guides/thoroughness.md`](../guides/thoroughness.md) § Input. Resolve the knobs once per
   `guides/thoroughness.md § Input` (flags, then `project.md` `thoroughness`, then the preset)

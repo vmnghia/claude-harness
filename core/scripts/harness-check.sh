@@ -1179,6 +1179,10 @@ grep -qF 'two `Agent` dispatches' "$CMD" 2>/dev/null && fail "adversarial-review
 tr '\n' ' ' < "$CMD" 2>/dev/null | sed 's/  */ /g' | grep -qF 'round N of ≤ M, W hunters, about $X' && ok "adversarial-review.md cost line matches the guide § Report" || fail "adversarial-review.md cost line differs from the guide § Report"
 tr '\n' ' ' < "$WF" 2>/dev/null | sed 's/  */ /g' | grep -qF 'A round of parallel briefs to one teammate type counts once toward `--max-iter`; the width is the number of agents in that round.' \
   && ok "ai-workflow.md § Bounds holds the counting sentence" || fail "ai-workflow.md § Bounds lacks the counting sentence"
+grep -qF 'knobs.width.adversarial-reviewer' "$CMD" 2>/dev/null && ok "adversarial-review.md dispatches knobs.width.adversarial-reviewer" || fail "adversarial-review.md never mentions knobs.width.adversarial-reviewer"
+tr '\n' ' ' < "$WF" 2>/dev/null | sed 's/  */ /g' | grep -qiF 'team-flow widths are 1' && ok "ai-workflow.md § Bounds: team-flow widths are 1" || fail "ai-workflow.md § Bounds lacks 'team-flow widths are 1'"
+grep -qF -- '--max-iter ignored, using 3' "$CMD" 2>/dev/null && fail "adversarial-review.md --max-iter fallback still hard-codes 3" || ok "adversarial-review.md --max-iter fallback names the preset cap"
+grep -qE 'warn and use the default' "$H/commands/feature-flow.md" 2>/dev/null && ok "feature-flow.md caps fall back to the default" || fail "feature-flow.md caps lack the fallback"
 grep -qE 'two hunters|both hunters' "$H/guides/ai-workflow.md" "$H/agents/review-judge.md" 2>/dev/null \
   && fail "ai-workflow.md / review-judge.md still say two/both hunters" || ok "ai-workflow.md / review-judge.md name no fixed hunter pair"
 
