@@ -225,10 +225,10 @@ one (§ Closing the run, "Start, restart, resume").
 
 **Knobs and the ceiling.** Critic width is `knobs.width.research-critic` and `K` is
 `knobs.dry`, resolved once by `/research` (`thoroughness.md § Input`); critics and judges get
-numbers, never the guide. Before the lead is dispatched, `/research` reserves the critique's
-share of `max_agents`: `critic width × (K + 1)` critics plus `critic width` judges
-(`thoroughness.md § Agent ceiling`, "One ceiling, three dispatchers"). The lead's capsule
-carries the remainder as its `max_agents`. After the lead returns, the critique's `dispatched`
+numbers, never the guide. Before the lead is dispatched, `/research` subtracts the critique's
+reserve (0 with the critique off; `guides/thoroughness.md § Agent ceiling`, "One ceiling,
+three dispatchers") from `max_agents`. The lead's capsule carries the remainder as its
+`max_agents`. After the lead returns, the critique's `dispatched`
 starts at the dispatches the lead counted against its share (its `dispatches[]`); every critic
 and every judge adds 1, and so does every `redispatch` in a `REBUTTAL` block, which also counts
 toward the lead's share and that teammate's round cap. A dispatch fits when
@@ -377,10 +377,10 @@ sameness rule.
 - **End.** After each round's synthesis: `dry_streak` reaching `K` → the critique ended dry;
   otherwise `dry_rounds` reaching its hard cap of `2K` further rounds → it ends, and the report
   says the loop was **cut at its cap**, not dry; otherwise a further round (subject to the
-  ceiling). The critique therefore runs at most `1 + 2K` rounds. The reserve's
-  `critic width × (K + 1)` covers the shortest path to a dry end whether round 1 is dry or not;
-  rounds past it run on what the lead left of the ceiling and are cut at the agent ceiling when
-  they do not fit.
+  ceiling). The critique therefore runs at most `1 + 2K` rounds. The reserve
+  (`guides/thoroughness.md § Agent ceiling`) covers the shortest path to a dry end whether
+  round 1 is dry or not; rounds past it run on what the lead left of the ceiling and are cut
+  at the agent ceiling when they do not fit.
 
 ### Closing the run
 

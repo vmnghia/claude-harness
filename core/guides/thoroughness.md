@@ -151,7 +151,9 @@ The lead counts every team dispatch against it, including the investigator's fre
 dispatches (one per `repro_agent_id` it reports; a resume is not one). After the lead returns,
 `/research` reads `dispatches[]`, and the critique counts against what is left of the whole
 ceiling, so an under-spent lead leaves more room, never less. At `exhaustive`, 64 leaves the lead
-39 after the critique's reserve (5 critics × 4 rounds + 5 judges).
+39 after the critique's reserve (5 critics × 4 rounds + 5 judges). With the critique off
+(`--no-critique`, `quick`, or an older capsule) the reserve is 0 and the lead's `max_agents` is
+the whole ceiling.
 
 ## Input
 

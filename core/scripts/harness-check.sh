@@ -1321,9 +1321,11 @@ for hd in '### The round' '### Rebuttal' '### Dry loop' '### Closing the run' '#
   printf '%s\n' "$RCQ" | grep -qxF -- "$hd" && ok "§ Critique has '$hd'" || fail "§ Critique lacks '$hd'"
 done
 for tok in 'FIXED' 'REBUTTAL' 'OUTSIDE_RUN' 'rebuttal: unavailable' 'critique.md' 'second main-session file' \
-           '--critique' 'critic width × (K + 1)'; do
+           '--critique'; do
   printf '%s\n' "$RCQ" | grep -qF -- "$tok" && ok "§ Critique mentions $tok" || fail "§ Critique never mentions $tok"
 done
+TH="$H/guides/thoroughness.md"
+grep -qF 'critic width × (K + 1)' "$TH" 2>/dev/null && ok "thoroughness.md holds the reserve formula" || fail "thoroughness.md lacks the reserve formula"
 sub() { printf '%s\n' "$RCQ" | sed -n "/^### $1\$/,/^##/{/^### $1\$/b;/^##/q;p;}"; } # one ### subsection's body
 for tok in '1 + 2K' '60 %'; do
   sub 'Dry loop' | grep -qF -- "$tok" && ok "§ Critique › Dry loop mentions $tok" || fail "§ Critique › Dry loop never mentions $tok"
@@ -1460,7 +1462,7 @@ for pair in 'settled: true|/^## Resume/,/^## Standalone/' 'settled: false|/^## R
   tok=${pair%%|*}; rg=${pair#*|}
   rsec "$rg" | tr '\n' ' ' | sed 's/  */ /g' | grep -qF -- "$tok" && ok "research.md has $tok in its section" || fail "research.md lacks $tok in its section ($rg)"
 done
-for tok in '--no-critique' '--effort=quick' 'knobs.width.research-critic'; do
+for tok in '--no-critique' '--effort=quick' 'below the floor'; do
   rsec '/^3\. \*\*Dispatch/,/^4\. /' | tr '\n' ' ' | sed 's/  */ /g' | grep -qF -- "$tok" && ok "research.md step 3 carries the off condition $tok" || fail "research.md step 3 lacks the off condition $tok"
 done
 rsec '/^## Input/,/^## New run/' | grep -qF 'critic width ×' && fail "research.md § Input restates the reserve formula" || ok "research.md names the reserve by section only"
@@ -1468,6 +1470,15 @@ RS3=$(sed -n '/^3\. \*\*Dispatch/,/^4\. /p' "$RC" 2>/dev/null)
 printf '%s\n' "$RS3" | grep -qF 'the whole ceiling' && fail "research.md step 3 still passes the whole ceiling" || ok "research.md step 3 no longer passes the whole ceiling"
 printf '%s\n' "$RS3" | grep -qF 'reserve' && ok "research.md step 3 names the reserve" || fail "research.md step 3 lacks 'reserve'"
 printf '%s\n' "$RS3" | grep -qF 'critique: on' && ok "research.md step 3 capsule carries critique: on | off" || fail "research.md step 3 capsule lacks critique: on"
+grep -qF 'the reserve is 0' "$TH" 2>/dev/null && ok "thoroughness.md: the reserve is 0 with the critique off" || fail "thoroughness.md lacks 'the reserve is 0'"
+RS3L=$(printf '%s\n' "$RS3" | tr '\n' ' ' | sed 's/  */ /g')
+printf '%s\n' "$RS3L" | grep -qF 'critique: on | off` line' && ok "research.md step 3 persists critique in lead.txt" || fail "research.md step 3 lead.txt sentence lacks the critique line"
+RRS=$(rsec '/^## Resume/,/^## Standalone/' | tr '\n' ' ' | sed 's/  */ /g')
+printf '%s\n' "$RRS" | grep -qF 'critique: off' && ok "research.md Resume handles critique: off" || fail "research.md Resume lacks critique: off"
+printf '%s\n' "$RS3L" | grep -qF 'below the floor' && ok "research.md step 3 ignores a below-floor critic width" || fail "research.md step 3 lacks 'below the floor'"
+printf '%s\n' "$RS3L" | grep -qF 'knobs.width.research-critic' && fail "research.md step 3 still uses a zero critic width as an off switch" || ok "research.md step 3: no width-0 off switch"
+rsec '/^## Input/,/^## New run/' | grep -qF 'zero critic width' && fail "research.md § Input still has the zero-width off switch" || ok "research.md § Input: no zero-width off switch"
+grep -qF 'critic width ×' "$RW" 2>/dev/null && fail "research-workflow.md restates the reserve formula" || ok "research-workflow.md names the reserve by section only"
 grep -qF 'Until the research critique' "$TH" 2>/dev/null && fail "thoroughness.md keeps the 'Until the research critique lands' clause" || ok "thoroughness.md dropped the 'Until the research critique lands' clause"
 grep -qF 'step 8.3' "$RW" 2>/dev/null && fail "research-workflow.md still says research-lead.md step 8.3" || ok "research-workflow.md cites the Confluence step as step 10.3"
 grep -qF 'research-lead.md step 10.3' "$RW" 2>/dev/null || fail "research-workflow.md lacks 'research-lead.md step 10.3'"

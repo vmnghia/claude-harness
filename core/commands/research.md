@@ -24,8 +24,9 @@ Raw arguments: `$ARGUMENTS`.
   `lead.txt`, so `--resume` reuses them. The lead counts against the top-level `max_agents`
   passed here, not `knobs.max_agents`.
 - `--no-critique` → skip the critique (`guides/research-workflow.md § Critique`, "When it
-  runs"). `--effort=quick` implies it, and so does a resolved `knobs.width.research-critic` of 0.
-  Otherwise the critique runs by default.
+  runs"). `--effort=quick` implies it. A `--width=research-critic:<n>` below the floor is
+  ignored, never an off switch (`guides/thoroughness.md § Input`). Otherwise the critique runs
+  by default.
 - `--resume <folder>` → go to **Resume**.
 - `--critique <folder>` → the critique alone on an existing run, whatever its status
   (`guides/research-workflow.md § Critique`, "Standalone"). It takes the thoroughness flags.
@@ -41,15 +42,14 @@ Raw arguments: `$ARGUMENTS`.
 2. **Frame.** Execute research-lead.md § "Framing" **inline in this session**. It creates
    `findings.md` from the template (frontmatter, question, dispatch plan).
 3. **Dispatch.** Agent tool, `subagent_type: "research-lead"`, with: the folder path, the
-   framing, `--max-iter`, `knobs:` and `max_agents` (the ceiling minus the critique's reserve:
-   `/research` reserves the critique's share of `max_agents`, `guides/thoroughness.md § Agent
-   ceiling`), `critique: on | off` (`on` by default; `off` with
-   `--no-critique`, `--effort=quick`, or when `knobs.width.research-critic` would be 0; the lead
-   defers the Confluence draft when `on`), and a context capsule (`guides/ai-workflow.md`
-   template). Then write `lead.txt` in the folder:
-   `lead_agent_id: <id from the Agent result>`, followed by the resolved `knobs:` and
-   `max_agents:` lines for that agent id (Resume reuses them, never re-resolves). This is the
-   main session's only file in the folder; `run-log.md` belongs to the lead.
+   framing, `--max-iter`, `knobs:` and `max_agents` (the ceiling minus the critique's reserve (0
+   with the critique off; `guides/thoroughness.md § Agent ceiling`)), `critique: on | off` (`on` by
+   default; `off` with `--no-critique` or `--effort=quick`; a `--width=research-critic:<n>` below
+   the floor is ignored, never an off switch; the lead defers the Confluence draft when `on`), and a
+   context capsule (`guides/ai-workflow.md` template). Then write `lead.txt` in the folder:
+   `lead_agent_id: <id from the Agent result>`, followed by the resolved `knobs:` and `max_agents:`
+   lines and a `critique: on | off` line for that agent id (Resume reuses them, never re-resolves).
+   This is the main session's only file in the folder; `run-log.md` belongs to the lead.
 4. **Wait.** Do not end this turn while the lead is outstanding. Never read its transcript file.
    If the lead's task notification says `failed` on infrastructure (session limit / HTTP 429,
    API or network error), tell the owner what failed. Then say: "once it resets, run
@@ -76,9 +76,9 @@ Raw arguments: `$ARGUMENTS`.
 
 ## Resume
 
-1. Read `lead_agent_id` and the `knobs:` / `max_agents:` lines from `<folder>/lead.txt`; reuse
-   them, never re-resolve. If the folder, `lead.txt` or `lead_agent_id` is missing, stop and
-   say which one is missing.
+1. Read `lead_agent_id` and the `knobs:` / `max_agents:` / `critique:` lines from
+   `<folder>/lead.txt`; reuse them, never re-resolve. If the folder, `lead.txt` or `lead_agent_id`
+   is missing, stop and say which one is missing.
 2. Read `<folder>/critique.md`'s state block, if the file exists (the contract's "Start,
    restart, resume"). Its outcome selects what follows:
    - **(a) `settled: true`:** never start or restart a critique. Go to step 3 for the lead's
@@ -86,10 +86,13 @@ Raw arguments: `$ARGUMENTS`.
    - **(b) `settled: false`:** no message to the lead yet. The critique restarts its current
      round with fresh critics (**New run** step 5, from the state block); the lead is messaged
      only when that round reaches the rebuttal, or at "critique settled".
-   - **(c) no `critique.md`:** go to step 3, then **New run** step 4. When the lead returns
-     `ANSWERED` / `PARTIAL` after the resume, **New run** step 5 runs for the first time
-     (`critique: on`).
-   So the lead gets step 3's message in (a) and (c), and in (b) the critique's own messages.
+   - **(c) no `critique.md` and `lead.txt` says `critique: on`:** go to step 3, then **New run**
+     step 4. When the lead returns `ANSWERED` / `PARTIAL` after the resume, **New run** step 5
+     runs for the first time.
+   - **(d) `lead.txt` says `critique: off`:** step 3's message, Wait, Report as before this
+     branch.
+   So the lead gets step 3's message in (a), (c) and (d), and in (b) the critique's own
+   messages.
 3. SendMessage to that id. (SendMessage is a deferred tool: load its schema with ToolSearch
    `select:SendMessage` first.) Pick the message by how the lead stopped:
    - Last status block `AWAITING_HUMAN`: "done: <the action from that block>; continue."
