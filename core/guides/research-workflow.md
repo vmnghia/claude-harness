@@ -390,8 +390,9 @@ sameness rule.
    - writes **`## Critique`** in `findings.md`: the template's checked-claim table, one row per
      finding (`Claim (quoted) | Verdict | Severity | Evidence`, verdict = its end state), or
      `no findings` when no round raised one, plus one line naming `critique.md`;
-   - adds a `disputed` Open row per `ESCALATED` / `STALEMATE` finding: the question, and the
-     critic's and the lead's positions in one line each;
+   - adds a `disputed` Open row per `ESCALATED` / `STALEMATE` finding, in one fixed shape the
+     resume and the report find it by:
+     `disputed <id>: <question> — critic: <one line> — lead: <one line>`;
    - rewrites Answer and Next if any `FIXED` finding touched them (confidence line included),
      bumps `updated`, adds a Log line;
    - then, and only then, writes the Confluence draft, so a draft never carries a superseded
@@ -399,15 +400,18 @@ sameness rule.
    - returns its final status block with `critique: {rounds, findings, fixed, agreed,
      withdrawn, refuted, disputed}`.
 
-   **Status at close.** A `disputed` `blocker` or `major` is a claim the Answer or Next may turn
-   on that only the owner can settle: the lead returns `AWAITING_HUMAN` with
-   `action: "answer the disputed questions in Open (<ids>)"` and frontmatter `status: open`,
-   never `settled` (framing cites `settled` runs instead of re-investigating, and `/planner`
-   takes Next from them). The owner answers in chat; `/research --resume` sends
-   "done: <answers>" to the lead, which records them as Decisions rows, closes or supersedes
-   the findings, and finishes: `ANSWERED` → `settled`, or `PARTIAL` → `open` if a question
-   stays open. A `disputed` `minor` / `nit` leaves the status as the lead had it; the rows
-   remain. A critique with no findings leaves the status unchanged.
+   **Status at close.** With the critique on, the lead's first return writes the frontmatter
+   status as `open` whatever the token it returns; `settled` is written only at the finish. At
+   the finish the status is re-derived as in the lead's step 7 against the edited file:
+   a load-bearing claim moved to Open makes it `PARTIAL`. A `disputed` `blocker` or `major` is
+   a claim the Answer or Next may turn on that only the owner can settle: the lead returns
+   `AWAITING_HUMAN` with `action: "answer the disputed questions in Open (<ids>)"` and
+   frontmatter `status: open`, never `settled` (framing cites `settled` runs instead of
+   re-investigating, and `/planner` takes Next from them). The owner answers in chat;
+   `/research --resume` sends "done: <answers>" to the lead, which records them as Decisions
+   rows, closes or supersedes the findings, and finishes: `ANSWERED` → `settled`, or
+   `PARTIAL` → `open` if a question stays open. A `disputed` `minor` / `nit` does not change
+   the status; its row remains. A critique with no findings does not change it either.
 9. **Report.** `/research` shows the lead's final block, Answer, Next, the critique table and
    every `disputed` question on its own line, then the Confluence draft line, and says whether
    the loop ended dry, was cut at its cap, was cut at the agent ceiling, or ran one round

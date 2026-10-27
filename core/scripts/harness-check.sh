@@ -1404,24 +1404,39 @@ if [ -f "$RL" ]; then
   steps='Draft and return → Rebuttal → Finish → Confluence draft'
   [ "$order_ok" = 1 ] && ok "research-lead.md steps run $steps" \
     || fail "research-lead.md lacks the steps $steps in order"
-  for tok in 'REBUTTAL' 'critique:' '## Critique' 'no findings' 'disputed' \
-             'answer the disputed questions' 'never `settled`' 'critique settled' \
-             'FIX' 'MAINTAIN' 'OUTSIDE_RUN'; do
+  for tok in 'REBUTTAL' 'critique:' '## Critique' 'no findings' 'disputed' 'critique settled'; do
     grep -qF -- "$tok" "$RL" && ok "research-lead.md mentions $tok" \
       || fail "research-lead.md never mentions $tok"
   done
-  sed -n '/\*\*Rebuttal/,/\*\*Finish/p' "$RL" | grep -qw 'cap' \
-    && ok "research-lead.md Rebuttal step names the cap" \
-    || fail "research-lead.md Rebuttal step never names the cap"
-  sed -n '/\*\*Finish/,/\*\*Confluence/p' "$RL" | grep -qF 'Lessons' \
-    && ok "research-lead.md Finish step adds a Lessons row" \
-    || fail "research-lead.md Finish step never names Lessons"
+  lstep() { sed -n "/\*\*$1/,/\*\*$2/p" "$RL"; } # one step of the lead, by its bold names
+  lstep 'Draft and return' 'Rebuttal' | grep -qF '`open` whatever the token' \
+    && ok "research-lead.md Draft and return writes status open under critique: on" \
+    || fail "research-lead.md Draft and return lacks '\`open\` whatever the token'"
+  for tok in 'FIX' 'MAINTAIN' 'OUTSIDE_RUN'; do
+    lstep 'Rebuttal' 'Finish' | grep -qF -- "$tok" \
+      && ok "research-lead.md Rebuttal step names $tok" \
+      || fail "research-lead.md Rebuttal step never names $tok"
+  done
+  lstep 'Rebuttal' 'Finish' | grep -qF 'Open row naming the cap' \
+    && ok "research-lead.md Rebuttal step moves a cap-exhausted FIX to Open" \
+    || fail "research-lead.md Rebuttal step lacks 'Open row naming the cap'"
+  for tok in 'Lessons' 'answer the disputed questions' 'never `settled`' \
+             'disputed <id>: <question> — critic:'; do
+    lstep 'Finish' 'Confluence' | grep -qF -- "$tok" \
+      && ok "research-lead.md Finish step names $tok" \
+      || fail "research-lead.md Finish step never names $tok"
+  done
   sed -n '/\*\*Confluence draft/,/^## /p' "$RL" | grep -qE 'only after (step 9|the \*\*Finish)' \
     && ok "research-lead.md Confluence step runs only after the finish" \
     || fail "research-lead.md Confluence step lacks 'only after step 9'"
 else
   fail "research-lead.md missing"
 fi
+for tok in '`open` whatever the token' 'a load-bearing claim moved to Open makes it `PARTIAL`' \
+           'disputed <id>: <question> — critic:'; do
+  sub 'Closing the run' | grep -qF -- "$tok" && ok "§ Critique › Closing the run names $tok" \
+    || fail "§ Critique › Closing the run never names $tok"
+done
 
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true

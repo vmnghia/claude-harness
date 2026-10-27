@@ -202,11 +202,14 @@ are `guides/adversarial-review.md` § Critique variants.
    - Frontmatter `status`: `settled` for `ANSWERED`, `open` for `PARTIAL` /
      `AWAITING_HUMAN`, `stopped` for `STOPPED` (with `status_reason`). Update `updated`, add
      a Log line.
+     - With `critique: on`, write `status: open` instead of `settled`: the frontmatter is
+       `open` whatever the token you return; `settled` is written only in step 9.
    - Then, by the capsule's `critique:` and your status:
      - `critique: on`, `ANSWERED` / `PARTIAL`: return now (§ Output, `critique: null`),
        **without** the Confluence draft. The main session runs the critique and resumes you
        with the critique message (step 8), then the "critique settled" message (step 9); step
-       10 follows step 9.
+       10 follows step 9. Step 8 may not come: when no finding is sent, the next message is
+       "critique settled".
      - `critique: off`, `ANSWERED` / `PARTIAL`: no critique runs; step 10, then return.
      - `AWAITING_HUMAN` / `STOPPED`: return now. No critique runs on `STOPPED`; on
        `AWAITING_HUMAN` it waits for the resume that ends in `ANSWERED` / `PARTIAL`, which then
@@ -224,10 +227,13 @@ are `guides/adversarial-review.md` § Critique variants.
      - A fix that needs new evidence may re-dispatch the teammate (`redispatch: <teammate>`).
        It counts toward that teammate's round cap and your share of `max_agents` (step 1's
        counters, a run-log dispatch line, a `dispatches[]` entry); wait for its report and run
-       steps 4–5 on it before you reply.
-     - The cap or your share exhausted: move the claim to Open naming the cap or the ceiling
-       that stopped it, and still answer `FIX`, with `edit` saying the claim moved to Open and
-       why. A claim is never dropped silently.
+       steps 4–5 on it before you reply. A re-dispatched teammate's `AWAITING_HUMAN` /
+       `STOPPED`, or a send that fails, is evidence out of reach: handle it as the next bullet
+       and answer `FIX`; never return a status block before step 9.
+     - The cap or your share exhausted (or the evidence otherwise out of reach): relabel the
+       Finding `unverified` in place (or supersede it) and add an Open row naming the cap or
+       the ceiling that stopped it, as step 5 does. Still answer `FIX`, with `edit` saying what
+       was relabelled and which Open row was added. A claim is never dropped silently.
    - **`MAINTAIN`** when the claim holds as written. `new_evidence` is required and is never
      `none`: a pin, a `results.txt` marker, a quote check, a script and its output that answers
      the critic's trigger. Restating the claim is not evidence.
@@ -239,8 +245,9 @@ are `guides/adversarial-review.md` § Critique variants.
    - **Turn message** ("Turn <k> on <ids>", with the critic's last turn on each): another
      `REBUTTAL` block for those ids only. A `CHALLENGE` on a `FIX` names the line of
      `findings.md` that still fails: fix it (a `FIX`, applied before the reply), or `MAINTAIN` /
-     `OUTSIDE_RUN` with new evidence. From your second turn on a finding, rate the critic's last
-     turn with `peer_added_evidence` (`yes` only for evidence that is new and checkable). The
+     `OUTSIDE_RUN` with new evidence. In every turn-message reply, rate the critic's last turn
+     with `peer_added_evidence` (`yes` only for evidence that is new and checkable; the first
+     `REBUTTAL` has no critic turn to rate). The
      evidence gate, exhaustion and the 8-turn cap are `guides/adversarial-review.md` § Debate
      rules: every turn of yours brings new evidence or concedes with a `FIX`.
    - **Findings added later** (in a turn message, or a critique message of their own): answer
@@ -250,18 +257,20 @@ are `guides/adversarial-review.md` § Critique variants.
      `UPHELD` → accept with a `FIX` (applied before the reply); a `MAINTAIN` or `OUTSIDE_RUN`
      is a challenge and carries new evidence. `OUTSIDE_RUN` → accept with `OUTSIDE_RUN` (the
      judge's question) or concede with a `FIX`; a `MAINTAIN` with new evidence is a challenge.
-     `REFUTED` went your way: the message says "For information; no reply.", so don't reply.
+     `REFUTED` went your way: the message says "For information; no reply.", so your reply is
+     one line ("noted <id>"), no block.
      After a challenge the judge answers once and you get one more turn: accept per the
      ruling, or challenge again, which ends the finding `STALEMATE` for the owner.
    - Nothing but a `FIX` edits `findings.md`. Leave the frontmatter `status` and the Confluence
-     draft alone until step 9.
+     draft alone until step 9, and never return a status block before it.
 9. **Finish** (on the "critique settled" message: the round count, the case file path, the
    final table, the `disputed:` entries).
    - Write `## Critique` in `findings.md` per the template: one row per finding of the final
      table (`Claim (quoted) | Verdict | Severity | Evidence`, verdict = its end state), or
      `no findings` when no round raised one, plus the `Case file:` line naming `critique.md`.
-   - Add a `disputed` Open row per `ESCALATED` / `STALEMATE` finding: its question, then the
-     critic's position and yours, one line each.
+   - Add one Open row per `ESCALATED` / `STALEMATE` finding, in this shape (the resume and
+     `/research`'s report find the rows by it):
+     `disputed <id>: <question> — critic: <one line> — lead: <one line>`.
    - Rewrite Answer and Next if any `FIXED` finding touched them, confidence line included.
    - Add a `Lessons` row for every finding your own step 5 spot-check should have caught (a
      load-bearing claim whose cited evidence did not hold), with its "Promote to".
@@ -270,14 +279,14 @@ are `guides/adversarial-review.md` § Critique variants.
        `action: "answer the disputed questions in Open (<ids>)"` and frontmatter
        `status: open`, never `settled`: framing cites `settled` runs instead of
        re-investigating them, and `/planner` takes Next from them.
-     - Otherwise the status stays as you returned it in step 7: a `disputed` `minor` / `nit`
-       keeps its row and leaves the status alone, and so does a critique with no findings.
-       The exception is a `FIX` that moved a load-bearing claim to Open: then `PARTIAL`.
+     - Otherwise re-derive the status as step 7 would against the edited file, by that
+       section's "Status at close", and write the frontmatter by step 7's mapping (`settled`
+       for `ANSWERED`, `open` for `PARTIAL`).
    - Bump `updated`, add a Log line, then step 10 when the status is `ANSWERED` or `PARTIAL`.
-     Return your final status block with `critique:` filled from the final table.
+     Return your final status block with `critique:` filled in (§ Output).
    - **Resume after a disputed close.** `/research --resume` sends you "done: <answers>".
      Record each answer as a Decisions row (dated, `Who: <owner>`), close or supersede the
-     findings it settles (the template's supersede rule) and their `disputed` Open rows,
+     findings it settles (the template's supersede rule) and their `disputed <id>:` Open rows,
      rewrite Answer and Next if an answer changes them, and finish again: `ANSWERED` →
      `settled`, or `PARTIAL` → `open` if a question stays open; bump `updated`, add a Log line,
      run step 10, and return the final block with the same `critique:` counts. The critique is
@@ -308,7 +317,8 @@ are `guides/adversarial-review.md` § Critique variants.
 
 ## Output
 
-End your reply with exactly one status block:
+End your reply with exactly one status block (in step 8, a `REBUTTAL` block, or one line for
+an information-only message):
 
 ```yaml
 ---
@@ -329,26 +339,11 @@ payload:
                                   # teammate's counter after this round
   confluence_draft: null          # { url, content_id, version, action: created | updated } — unpublished; the owner publishes
   critique: null                  # final block after step 9: { rounds, findings, fixed, agreed,
-                                  # withdrawn, refuted, disputed }, counted from the final table
+                                  # withdrawn, refuted, disputed }; rounds from the settled
+                                  # message's "after <n> round(s)", the rest from its table
 ---
 ```
 
-In step 8, and in every reply to a turn or judge-ruling message, your reply ends instead with
-the `REBUTTAL` phase block (shape: `guides/adversarial-review.md` § Critique variants):
-
-```yaml
----
-agent: research-lead
-phase: rebuttal
-status: REBUTTAL
-payload:
-  responses:
-    - id: A1
-      response: FIX | MAINTAIN | OUTSIDE_RUN
-      new_evidence: <required with MAINTAIN; "none" with FIX>
-      peer_added_evidence: yes | no   # from the lead's second turn on a finding
-      edit: <FIX only: what changed in findings.md, one line ("#3 relabelled inferred")>
-      redispatch: <FIX only, optional: the teammate re-dispatched; counts toward its cap>
-      question: <OUTSIDE_RUN only: the one thing only the owner can settle>
----
-```
+Your reply to a critique, turn or judge-ruling message (step 8) ends instead with the
+`REBUTTAL` phase block, whose shape lives in `guides/adversarial-review.md` § Message shapes ›
+Critique variants.
