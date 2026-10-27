@@ -1118,6 +1118,28 @@ sed -n '/^## Delta and probed$/,/^## /p' "$TH" 2>/dev/null | grep -qF 'git ls-fi
   && ok "thoroughness.md § Delta counts untracked files (git ls-files --others)" || fail "thoroughness.md § Delta ignores untracked files"
 grep -qF 'thoroughness.md' "$H/CLAUDE.md" && ok "CLAUDE.md § Guides lists thoroughness.md" || fail "CLAUDE.md § Guides does not list thoroughness.md"
 
+# adversarial review rewired to the knobs (task 2): four angles, N-way tally, delta, dry-check rounds
+for tok in time-and-config claims-and-consumers hunter-H probed "designated challenger" "no majority" "dry-check round" dry_rounds "knobs:" 2K "cut at its cap" "survives its cross-examination" "reason: agent ceiling" "thoroughness.md § Angles" "Here are the other hunters' findings, grouped by hunter" "Name what you probed in"; do
+  grep -qF -- "$tok" "$AR" 2>/dev/null && ok "adversarial-review.md mentions $tok" || fail "adversarial-review.md never mentions $tok"
+done
+grep -qF 'A round of parallel briefs to one teammate type counts once toward `--max-iter`; the width is the number of agents in that round.' "$AR" 2>/dev/null \
+  && ok "adversarial-review.md holds the counting sentence verbatim (counts once toward)" || fail "adversarial-review.md lacks the counting sentence verbatim"
+sed -n '/^### Hunt capsule/,/^### Hunt reply/p' "$AR" 2>/dev/null | grep -qF delta \
+  && ok "adversarial-review.md hunt capsule carries the delta" || fail "adversarial-review.md hunt capsule has no delta"
+sed -n '/^### Hunt reply/,/^### Cross-examination message/p' "$AR" 2>/dev/null | grep -qF 'probed:' \
+  && ok "adversarial-review.md hunt reply has probed" || fail "adversarial-review.md hunt reply lacks probed"
+sed -n '/^## Case file/,/^## Tool boundaries/p' "$AR" 2>/dev/null | grep -qF 'knobs:' \
+  && ok "adversarial-review.md state block has knobs:" || fail "adversarial-review.md state block lacks knobs:"
+sed -n '/^## Case file/,/^## Tool boundaries/p' "$AR" 2>/dev/null | grep -qF 'dry_rounds:' \
+  && ok "adversarial-review.md state block has dry_rounds:" || fail "adversarial-review.md state block lacks dry_rounds:"
+sed -n '/^### The loop/,/^### Report/p' "$AR" 2>/dev/null | grep -qF 'git ls-files --others' \
+  && ok "adversarial-review.md § The loop computes the delta over untracked files" || fail "adversarial-review.md § The loop delta ignores untracked files"
+grep -qF 'Dispatch two `adversarial-reviewer`' "$AR" 2>/dev/null \
+  && fail "adversarial-review.md still dispatches a fixed two hunters (fixed width)" || ok "adversarial-review.md dispatches the resolved hunter width"
+for tok in time-and-config claims-and-consumers hunter-H probed cycle; do
+  grep -qF -- "$tok" "$HUNTER" 2>/dev/null && ok "adversarial-reviewer mentions $tok" || fail "adversarial-reviewer never mentions $tok"
+done
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
