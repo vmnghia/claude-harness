@@ -10,8 +10,8 @@ Four agents; Planner is **dual-entry**, the other three are subagents only.
 
 The seven-agent **research team** (`/research`) has its own contract:
 [research-workflow.md](./research-workflow.md). So does **`/adversarial-review`**
-([adversarial-review.md](./adversarial-review.md)): two hunters and a judge, no spec, reusing
-Coder in findings-only mode.
+([adversarial-review.md](./adversarial-review.md)): the round's hunters
+(`knobs.width.adversarial-reviewer`) and a judge, no spec, reusing Coder in findings-only mode.
 
 - `/planner <requirement | FRONT-XXXX>` — executes `.claude/agents/planner.md`
   **inline in the main session** (interactive mode: AskUserQuestion allowed,
@@ -324,6 +324,8 @@ position wakes a context.
 - Owner questions are batched at a step boundary and asked once, with positions attached, unless
   a peer is blocked on one now.
 - The lead relays blocks, never prose; prose stays in the run document.
+- A round of parallel briefs to one teammate type counts once toward `--max-iter`; the width is
+  the number of agents in that round. (Team-flow widths are 1; see `guides/thoroughness.md`.)
 
 ### Resume
 

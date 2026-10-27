@@ -1,6 +1,6 @@
 ---
-description: Adversarial review — two hunters try to break the diff, debate every finding to a resolved state with a judge behind them, Coder fixes what survived, fresh hunters check the fix. No spec needed.
-argument-hint: "[--base=<ref>] [--max-iter=N] [--no-fix] [--auto] [--resume [<case-file>]] [context…]"
+description: Adversarial review — parallel hunters try to break the diff, debate every finding to a resolved state with a judge behind them, Coder fixes what survived, fresh hunters check the fix. No spec needed.
+argument-hint: "[--base=<ref>] [--max-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] [--no-fix] [--auto] [--resume [<case-file>]] [context…]"
 ---
 
 Contract: Read [`.claude/guides/adversarial-review.md`](../guides/adversarial-review.md) first
@@ -21,8 +21,13 @@ Raw arguments: `$ARGUMENTS`. Parse out:
 - `--base=<ref>` → the diff base. Default: resolve as `reviewer.md` § Procedure step 1 does
   (merge-base against `origin/stable`, else `origin/master`, else `master`).
 - `--max-iter=N` → the cap on `review_iter`. Must be a positive integer; otherwise warn
-  `--max-iter ignored, using 3` and use 3. Default 3.
-- `--no-fix` → stop after the first round's synthesis; never dispatch Coder. Default off.
+  `--max-iter ignored, using 3` and use 3. Default: the preset's adversarial cap.
+- Thoroughness flags (`--effort`, `--width`, `--dry`, `--max-agents`) → parse and validate per
+  [`guides/thoroughness.md`](../guides/thoroughness.md) § Input. Resolve the knobs once per
+  `guides/thoroughness.md § Input` (flags, then `project.md` `thoroughness`, then the preset)
+  and write them into the case file's `knobs:`.
+- `--no-fix` → stop after the first round's synthesis; never dispatch Coder; keeps dry-check
+  rounds (the guide § The loop). Default off.
 - `--auto` → skip the owner pause; report `ESCALATED` questions at the end instead. Default off.
 - `--resume [<case-file>]` → go to **Resume**.
 - Everything else, verbatim, is the **context** text (a ticket key, a sentence). It goes into
@@ -40,16 +45,17 @@ Raw arguments: `$ARGUMENTS`. Parse out:
   the case file would be committed by a `git add .` and suggest adding `.claude/runs/` to the
   project's `.gitignore`. Append each
   phase's blocks verbatim as they arrive; rewrite the state block at every round boundary.
-- **Before each round**, print one line with the round number, the cap, and an estimated cost:
-  the fixture run cost about $4 per round on a four-file diff with no callers; scale by the
-  diff's size and the number of consumers the hunters will have to read.
-- **Hunters:** two `Agent` dispatches with `subagent_type: "adversarial-reviewer"` in **one
-  message**, so they run in parallel. One gets `role: hunter-A`, angle `inside-out`; the other
-  `role: hunter-B`, angle `outside-in`. Each capsule is the guide's hunt capsule; copy the session
-  scratchpad path from your Environment line into it, and the list of paths the hunter never
-  reads (guide § Tool boundaries). Record both agent ids in the state block.
+- **Before each round**, print one line in the guide's § Report format, "round N of ≤ M, W hunters,
+  about $X", an estimated cost: the fixture run cost about $4 per round on a four-file diff with no
+  callers; scale by the diff's size and the number of consumers the hunters will have to read.
+- **Hunters:** `knobs.width.adversarial-reviewer` `Agent` dispatches with
+  `subagent_type: "adversarial-reviewer"` in **one message**, so they run in parallel: letters
+  from `A`, each with its angle (guide § Procedure round step 1). Each capsule is the guide's
+  hunt capsule; copy the session scratchpad path from your Environment line into it, and the
+  list of paths the hunter never reads (guide § Tool boundaries). Record every agent id in the
+  state block.
 - **Cross-examination, turns, judge rulings to the hunters:** `SendMessage` to the hunter's
-  **agent id**, never its name — both hunters share one name, and a message by name goes to
+  **agent id**, never its name — the hunters share one name, and a message by name goes to
   whichever one answers first. `SendMessage` is a deferred tool: load it once with ToolSearch
   `select:SendMessage` before the first send. Each message carries only the still-open findings
   it concerns, in the guide's message shapes.
@@ -63,8 +69,8 @@ Raw arguments: `$ARGUMENTS`. Parse out:
   `FIX FROM ADVERSARIAL REVIEW`, the case-file path, and every `AGREED` `blocker`/`major` finding
   in finding shape. No spec. Coder's `not_applicable[]` entries go up the judge ladder in this
   round, per the guide § The loop.
-- **Fresh hunters:** every new round dispatches two **new** hunters. Never message the previous
-  round's hunters again, and never pass them the previous round's findings.
+- **Fresh hunters:** every new round dispatches **new** hunters, the same width. Never message the
+  previous round's hunters again, and never pass them the previous round's findings.
 - **Report:** in this session, the guide § Report, then the final block.
 
 ## Resume
@@ -104,7 +110,7 @@ summary: <one line>
 - No judging of finding content: you check that a turn carries `new_evidence` and
   `peer_added_evidence`, and you relay. Severity, validity and evidence are the agents' calls
   and the judge's.
-- Never collapse the two hunter dispatches into one, never let a hunter see the other's work
+- Never collapse the hunter dispatches into one, never let a hunter see the other's work
   except through the message you send, and never carry round N's findings into round N+1's
   capsules.
 - Never skip the branch gate when fixes are on, and never run Tester: the fresh hunters are the

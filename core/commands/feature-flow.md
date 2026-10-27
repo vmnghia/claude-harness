@@ -1,6 +1,6 @@
 ---
 description: End-to-end AI feature flow as a team — lead (this session) + persistent Planner, Coder, Tester, Reviewer who ask each other questions through the lead, are convened for decisions, then the adversarial-review gate; ends ready for human apply
-argument-hint: <requirement | FRONT-XXXX> [--auto] [--no-test] [--max-iter=N] [--max-gate-iter=N] [--resume [<run-document>]]
+argument-hint: <requirement | FRONT-XXXX> [--auto] [--no-test] [--max-iter=N] [--max-gate-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] [--resume [<run-document>]]
 ---
 
 Contract: Read [`.claude/guides/ai-workflow.md`](../guides/ai-workflow.md) first and execute its
@@ -26,7 +26,13 @@ Raw arguments: `$ARGUMENTS`. Parse out:
   does not (guide § Blockers and decisions).
 - `--no-test` → no Tester standby, no Tester step, no Tester voice in councils; warn.
 - `--max-iter=N` → cap on `test_iter` and `review_iter` (default 3).
-- `--max-gate-iter=N` → cap on `gate_iter` (default 2).
+- `--max-gate-iter=N` → cap on `gate_iter` (default: the preset's adversarial cap, 2 at
+  `standard`; the preset sets it).
+- Thoroughness flags (`--effort`, `--width`, `--dry`, `--max-agents`) → parse and validate per
+  [`guides/thoroughness.md`](../guides/thoroughness.md) § Input. Resolve the knobs once per
+  `guides/thoroughness.md § Input` (flags, then `project.md` `thoroughness`, then the preset)
+  and write them into the run document's `knobs:`. `--max-iter` (Tester/Reviewer) is not
+  touched by the preset.
 - `--resume [<run-document>]` → go to **Resume**.
 
 A positive integer is required for the caps; otherwise warn and use the default. Missing
@@ -60,7 +66,8 @@ requirement without `--resume` → stop with the final block, `status: NEEDS_CLA
   council round: who is convened and why.
 - **Owner pause:** `AskUserQuestion`, with the team's positions attached, batched at a step
   boundary unless a peer is blocked now. Not under `--auto`.
-- **Gate:** the adversarial guide's procedure with this session as orchestrator: fresh hunters
+- **Gate:** the adversarial guide's procedure with this session as orchestrator: hunters at
+  `knobs.width.adversarial-reviewer`, dry-check rounds per the guide, fresh hunters
   by `Agent` with `subagent_type: "adversarial-reviewer"`, the judge by `"review-judge"`, Coder
   **resumed** by id in findings-only mode with the spec and decisions available, Tester resumed
   after each gate fix, `gate_iter` counted here. A hunt reply's `questions[]` go to Coder by id

@@ -1160,6 +1160,28 @@ for tok in time-and-config claims-and-consumers hunter-H probed cycle; do
   grep -qF -- "$tok" "$HUNTER" 2>/dev/null && ok "adversarial-reviewer mentions $tok" || fail "adversarial-reviewer never mentions $tok"
 done
 
+# commands carry the shared flags (task 3); research.md joins the loop in task 4
+FF="$H/commands/feature-flow.md"
+for c in adversarial-review feature-flow; do
+  hint=$(grep -m1 '^argument-hint:' "$H/commands/$c.md" 2>/dev/null)
+  if printf '%s\n' "$hint" | grep -qE -- '--max-iter|--max-gate-iter'; then
+    printf '%s\n' "$hint" | grep -qF -- '--effort' && ok "commands/$c.md argument-hint carries --effort" || fail "commands/$c.md argument-hint lacks --effort"
+  fi
+done
+for c in adversarial-review feature-flow; do
+  for tok in 'guides/thoroughness.md' '--width' 'knobs:' 'dry-check'; do
+    grep -qF -- "$tok" "$H/commands/$c.md" 2>/dev/null && ok "commands/$c.md mentions $tok" || fail "commands/$c.md never mentions $tok"
+  done
+done
+grep -qF 'keeps dry-check' "$CMD" 2>/dev/null && ok "adversarial-review.md: --no-fix keeps dry-check rounds" || fail "adversarial-review.md: --no-fix does not say it keeps dry-check rounds"
+grep -qE '^- `--max-gate-iter=N`.*preset' "$FF" 2>/dev/null && ok "feature-flow.md § Input: the preset sets --max-gate-iter" || fail "feature-flow.md § Input: --max-gate-iter does not name the preset"
+grep -qF 'two `Agent` dispatches' "$CMD" 2>/dev/null && fail "adversarial-review.md still says two Agent dispatches (fixed width)" || ok "adversarial-review.md dispatches the resolved width"
+tr '\n' ' ' < "$CMD" 2>/dev/null | sed 's/  */ /g' | grep -qF 'round N of ≤ M, W hunters, about $X' && ok "adversarial-review.md cost line matches the guide § Report" || fail "adversarial-review.md cost line differs from the guide § Report"
+tr '\n' ' ' < "$WF" 2>/dev/null | sed 's/  */ /g' | grep -qF 'A round of parallel briefs to one teammate type counts once toward `--max-iter`; the width is the number of agents in that round.' \
+  && ok "ai-workflow.md § Bounds holds the counting sentence" || fail "ai-workflow.md § Bounds lacks the counting sentence"
+grep -qE 'two hunters|both hunters' "$H/guides/ai-workflow.md" "$H/agents/review-judge.md" 2>/dev/null \
+  && fail "ai-workflow.md / review-judge.md still say two/both hunters" || ok "ai-workflow.md / review-judge.md name no fixed hunter pair"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
