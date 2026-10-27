@@ -429,6 +429,17 @@ rgate 0 "git reflog HEAD@{1}"      "git diff HEAD@{1}..HEAD"
 rgate 0 "rg quoted -g glob"        "rg -n foo -g '*.ts' src"
 rgate 0 "cat a glob"               "cat src/*.ts"
 rgate 0 "redirect into scratchpad" "git diff > $RSCR/adv-r1-hunter-A/d.txt 2>&1"
+# Separators inside quotes no longer split (2026-10-27); real ones still do, and a comment, where
+# bash and the gate would disagree about quotes, is denied.
+rgate 0 "grep quoted &&"           "grep -rn \"&&\" src"
+rgate 0 "grep quoted ; and |"      "grep -nE 'a; b|c' src/x.js"
+rgate 0 "rg quoted || pattern"     "rg -n 'x || y' src"
+rgate 0 "grep quoted newline"      "grep -n \"a
+b\" src/x.js"
+rgate 2 "quoted then real ;"       "grep -n 'a;b' src; git add -A"
+rgate 2 "quoted then real |"       "grep -n 'a|b' src | sh"
+rgate 2 "comment hides a newline"  "cat a #'
+git add -A #'"
 rgate 2 "scratchpad path with .."  "node $RSCR/../../etc/x.js"
 rgate 2 "allowed && denied"        "git diff && git add -A"
 rgate 2 "command substitution"     "node \$(echo $RSCR/p.js)"

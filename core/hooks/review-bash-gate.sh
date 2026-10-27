@@ -32,7 +32,8 @@
 # is checked) outside the scratchpad or /dev/null, `$(`, backticks, `${`, env assignments,
 # unquoted heredocs, a lone `&` (it runs the next command unchecked), process substitution
 # `<(…)` / `>(…)`, unbalanced quotes, `..` in a scratchpad path, and any segment of a compound
-# command that fails the above. Fail closed: unreadable input is denied. Every bypass closed on
+# command that fails the above (separators inside quotes do not split; an unquoted word-initial
+# `#` is denied). Fail closed: unreadable input is denied. Every bypass closed on
 # 2026-10-26 was measured against this file first.
 # Exit 0 = allow. Exit 2 = deny; stderr is shown to the agent.
 
@@ -145,9 +146,14 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     if (/\$["\x27]/.test(bare)) return "$\x27…\x27 / $\"…\" quoting (its escapes hide what the program receives)";
     if (/\{[^\s}]*(,|\.\.)/.test(bare)) return "brace expansion {a,b} / {1..3} (it turns one word into several)";
     var rd = redirects(shell, bare); if (rd) return rd;
-    // 4. Every segment of a compound command must pass. The split ignores quotes, so a separator
-    //    inside quotes only over-splits: the piece after it starts with a quote and is denied.
-    var segs = shell.split(/\n|&&|\|\||;|\|(?!\|)/), cwdScratch = false;
+    // 4. Every segment of a compound command must pass. Separators are found in `bare`, which keeps
+    //    every index of `shell`, so one inside quotes (`grep "a && b"`) no longer splits. That trusts
+    //    unquoted() to end each quote where bash does; a comment is where they part (bash ignores a
+    //    quote after `#`), so a word-initial unquoted `#` is denied.
+    if (/(^|[\s;&|()])#/.test(bare)) return "a shell comment (#): write the command without it";
+    var segs = [], from = 0, sep = /\n|&&|\|\||;|\|/g, sm, cwdScratch = false;
+    while ((sm = sep.exec(bare))) { segs.push(shell.slice(from, sm.index)); from = sm.index + sm[0].length; }
+    segs.push(shell.slice(from));
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i].trim(); if (!s) continue;
       var r = checkSegment(s, cwdScratch, cwd); if (r !== "allow") return r;
