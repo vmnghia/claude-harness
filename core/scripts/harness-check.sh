@@ -534,7 +534,7 @@ model_of() { sed -n 's/^model: //p' "$1" | head -1; }
 has_tool() { tools_of "$1" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -qx "$2"; }
 
 BROKEN=""
-RESEARCH_AGENTS="research-lead incident-investigator repro-driver searcher web-reader designer writer"
+RESEARCH_AGENTS="research-lead incident-investigator repro-driver searcher web-reader designer writer research-critic research-judge"
 for a in $RESEARCH_AGENTS; do
   f="$AG/$a.md"
   if [ ! -f "$f" ]; then fail "$a.md missing"; continue; fi
@@ -569,6 +569,8 @@ rtok "CANVAS_READY" designer
 rtok "COPY_READY" writer
 rtok "positive_control" searcher
 rtok "positive_control" repro-driver
+rtok "FINDINGS" research-critic
+rtok "UPHELD" research-judge
 
 for a in research-lead incident-investigator; do
   for t in Agent Write Edit; do
@@ -587,9 +589,19 @@ usable research-lead && { has_tool "$AG/research-lead.md" WebFetch && ok "resear
 for t in Grep Glob; do
   usable research-lead && { has_tool "$AG/research-lead.md" "$t" && fail "research-lead must not have $t (search via searcher)" || ok "research-lead has no $t"; }
 done
+# The critique's critic and judge re-open evidence; they never write, dispatch or message
+# (2026-10-27). Their Bash is gated by review-bash-gate.sh, so they are not in the no-Bash loop.
+for a in research-critic research-judge; do
+  for t in Agent Write Edit Grep Glob SendMessage; do
+    usable "$a" && { has_tool "$AG/$a.md" "$t" && fail "$a must not have $t" || ok "$a has no $t"; }
+  done
+  for t in WebFetch Bash; do
+    usable "$a" && { has_tool "$AG/$a.md" "$t" && ok "$a has $t" || fail "$a lacks $t"; }
+  done
+done
 # Confluence drafts: research-lead only, gated by its own frontmatter hook (2026-10-15).
 AT=mcp__plugin_atlassian_atlassian__
-for a in research-lead incident-investigator repro-driver searcher web-reader designer writer; do
+for a in $RESEARCH_AGENTS; do
   usable "$a" || continue
   for t in executeWrite executeDestructive; do
     has_tool "$AG/$a.md" "$AT$t" && fail "$a must not have $t (gateway to every Atlassian write)" || ok "$a has no $t"
@@ -610,7 +622,8 @@ for a in searcher writer web-reader designer; do
 done
 
 for pin in research-lead:claude-opus-5-5 incident-investigator:claude-opus-5-5 designer:claude-opus-5-5 \
-           writer:claude-opus-5-5 searcher:claude-haiku-5-5 web-reader:claude-haiku-5-5 repro-driver:claude-sonnet-5-5; do
+           writer:claude-opus-5-5 searcher:claude-haiku-5-5 web-reader:claude-haiku-5-5 repro-driver:claude-sonnet-5-5 \
+           research-critic:claude-opus-5-5 research-judge:claude-opus-5-5; do
   a="${pin%%:*}"; m="${pin#*:}"
   [ -f "$AG/$a.md" ] && { [ "$(model_of "$AG/$a.md")" = "$m" ] && ok "$a model $m" || fail "$a model is '$(model_of "$AG/$a.md")', expected $m"; }
 done
@@ -1307,6 +1320,38 @@ grep -qxF '## Critique' "$FT" 2>/dev/null && ok "findings-template.md has '## Cr
 grep -qxF '## Claims checked' "$FT" 2>/dev/null && fail "findings-template.md still has '## Claims checked'" || ok "findings-template.md has no '## Claims checked'"
 sed -n '/^## Critique$/,/^## /p' "$FT" 2>/dev/null | grep -qF 'no findings' \
   && ok "template § Critique says a run without findings writes 'no findings'" || fail "template § Critique lacks 'no findings'"
+# The critic and the judge (agents/research-critic.md, agents/research-judge.md). §5b holds their
+# status tokens, tool boundaries and model pins; these pin the exact tool line and the content.
+RC="$AG/research-critic.md"; RJ="$AG/research-judge.md"
+for f in "$RC" "$RJ"; do
+  b=$(basename "$f")
+  [ -f "$f" ] || { fail "$b missing"; continue; }
+  [ "$(tools_of "$f")" = "Read, Bash, WebFetch" ] && ok "$b tools are exactly 'Read, Bash, WebFetch'" \
+    || fail "$b tools are '$(tools_of "$f")', expected 'Read, Bash, WebFetch'"
+  for g in 'guides/research-workflow\.md' 'guides/adversarial-review\.md' 'rules/research-discipline\.md'; do
+    grep -qE "Read.*$g" "$f" && ok "$b Reads ${g//\\/}" || fail "$b never Reads ${g//\\/}"
+  done
+  sed -n 's/^description: //p' "$f" | head -1 | grep -qF '/research' \
+    && ok "$b description names /research" || fail "$b description never names /research"
+done
+if [ -f "$RC" ]; then
+  for tok in 'critic-A' 'critic-H' 'evidence-first' 'argument-first' 'scope-and-decisions' 'verify-quote.sh' \
+             'Zero findings is a valid result' 'unverifiable' '.remember/' '20 lines' 'only the field names'; do
+    grep -qF -- "$tok" "$RC" && ok "research-critic.md mentions $tok" || fail "research-critic.md never mentions $tok"
+  done
+fi
+if [ -f "$RJ" ]; then
+  for tok in 'UPHELD' 'REFUTED' 'OUTSIDE_RUN' 'question:' '.remember/' '20 lines'; do
+    grep -qF -- "$tok" "$RJ" && ok "research-judge.md mentions $tok" || fail "research-judge.md never mentions $tok"
+  done
+fi
+TB=$(sed -n '/^## Tool boundaries and lint$/,/^## /p' "$RW" 2>/dev/null)
+for a in research-critic research-judge; do
+  printf '%s\n' "$TB" | grep -qE "^\| $a \|" && ok "research-workflow.md tool table has a $a row" \
+    || fail "research-workflow.md tool table lacks a $a row"
+  printf '%s\n' "$TB" | sed -n '/^Model pins/,/^Only the tool list/p' | grep -qE "^\|.*\b$a\b.*\| \`claude-opus-5-5\`" \
+    && ok "research-workflow.md model pins name $a (opus)" || fail "research-workflow.md model pins never name $a as opus"
+done
 
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true

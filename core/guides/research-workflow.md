@@ -494,12 +494,14 @@ run never starts a critique; it resumes the lead, as today.
 | web-reader | — | — | — | — | WebFetch, WebSearch; Stop hook `quote-verify-gate.sh` in its frontmatter |
 | designer | ✅ | ✅ `design/` only | — | — | chrome-devtools subset; `Artifact` only with the owner's approval |
 | writer | ✅ | — | — | — | — |
+| research-critic | Read only (no Grep/Glob) | — | read-only git, scratchpad scripts, `verify-quote.sh` (gated by `review-bash-gate.sh`) | — | WebFetch (re-read a cited URL); no SendMessage |
+| research-judge | Read only (no Grep/Glob) | — | read-only git, scratchpad scripts, `verify-quote.sh` (gated by `review-bash-gate.sh`) | — | WebFetch (re-read a cited URL); no SendMessage |
 
 Model pins (2026-10-14; the lint compares each agent's `model:` line to this table):
 
 | Agent | Model |
 |---|---|
-| research-lead, incident-investigator, designer, writer | `claude-opus-5-5` |
+| research-lead, incident-investigator, designer, writer, research-critic, research-judge | `claude-opus-5-5` |
 | searcher, web-reader | `claude-haiku-5-5` (locate / quote only; the lead interprets) |
 | repro-driver | `claude-sonnet-5-5` |
 
@@ -510,17 +512,21 @@ written, are prose rules.
 
 1. Status tokens appear in both `research-workflow.md` and the agent file (`AWAITING_HUMAN` /
    research-lead, `DIAGNOSED` / investigator, `REPRODUCED` / repro-driver, `FOUND` / searcher,
-   `GATHERED` / web-reader, `CANVAS_READY` / designer, `COPY_READY` / writer). An agent still
-   carrying the STUB banner prints `SKIP (stub)`.
+   `GATHERED` / web-reader, `CANVAS_READY` / designer, `COPY_READY` / writer, `FINDINGS` /
+   research-critic, `UPHELD` / research-judge). An agent still carrying the STUB banner prints
+   `SKIP (stub)`.
 2. `positive_control` appears in `searcher.md` and `repro-driver.md` (same stub skip).
 3. Tool boundaries, from each `tools:` frontmatter line, stubs included: only research-lead and
    incident-investigator have `Agent`; only they and designer have `Write` or `Edit`; searcher,
    writer, web-reader and designer have no `Bash`; research-lead has `WebFetch` and no
-   `Grep`/`Glob` (it searches via `searcher` or pinned `git grep`). A `*` wildcard
-   in any tool list fails. No agent has Atlassian `executeWrite`/`executeDestructive`; only
-   research-lead has the Confluence create/update tools, and then its frontmatter must register
-   `confluence-draft-gate.sh` (whose allow/deny matrix is §2d).
-4. Model pins match the table above.
+   `Grep`/`Glob` (it searches via `searcher` or pinned `git grep`); research-critic and
+   research-judge have `Bash` and `WebFetch` and no `Agent`, `Write`, `Edit`, `Grep`, `Glob` or
+   `SendMessage` (their Bash is gated, so they are not in the no-`Bash` list; §5i pins their
+   exact tool line). A `*` wildcard in any tool list fails. No agent has Atlassian
+   `executeWrite`/`executeDestructive`; only research-lead has the Confluence create/update
+   tools, and then its frontmatter must register `confluence-draft-gate.sh` (whose allow/deny
+   matrix is §2d).
+4. Model pins match the table above, the critique's critic and judge included.
 5. `ai-workflow.md` contains the pointer to `research-workflow.md`.
 
 **§5c** (2026-10-16): `verify-quote.sh` and `quote-verify-gate.sh` offline matrices (`data:` URLs:
