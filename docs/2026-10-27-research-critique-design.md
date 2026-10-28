@@ -1,6 +1,6 @@
 # Research critique: peer review for `/research` findings
 
-Status: draft for the owner, 2026-10-27. Builder check done. **Prerequisite:**
+Status: approved by the owner 2026-10-27; implemented and merged 2026-10-28 (`d3c4601`); § Verified below. **Prerequisite:**
 [2026-10-27-thoroughness-knobs-design.md](./2026-10-27-thoroughness-knobs-design.md) (width,
 dry rounds, N-way cross-examination, presets, the agent ceiling) is built **first**; this
 design's plan starts once `guides/thoroughness.md`, the shared flags and the N-way tally exist,
@@ -374,3 +374,43 @@ cap. `--no-critique` is a `/research` flag only; `quick` implies it.
   are section references, not lines).
 - The never-read list wording for the critic (the hunters' list minus the run's own folder).
 - Which existing investigation folder serves as the fixture.
+
+## Verified (2026-10-28)
+
+**Task 6 step 1, the standalone fixture.** `/research --critique <folder>` in a fresh
+`claude -p` on an installed project (`install.sh --update` to `d3c4601`), against a settled
+`kind: codebase` investigation of 387 lines whose findings cite pinned SHAs. Wall clock 11.5 min.
+
+- `critique.md` was written next to `findings.md` with the full state block: `critique_round: 1`,
+  `dry_rounds: 0`, `dry_streak: 0`, `settled: true`, `dispatched: 2`, the resolved `knobs:`
+  (`standard`, critic width 2), `rebuttal: unavailable`, both critic ids, six findings, no
+  `disputed`. Sections `## Round 1` › `### Hunt A`, `### Hunt B`, `### Cross-examination`,
+  `### Re-check`, `### Synthesis`, each block verbatim.
+- `findings.md` byte-identical before and after (sha256 compared).
+- Findings: one `major` (A3 = B1, found independently by both critics from different angles: the
+  timing and error-page guarantees were read in the installed Next 15.5.9 source while the
+  migration targets Next 16, so the rejection of one option rested on evidence for the wrong
+  version); three `minor` (a build-time count of 24/26 stated as 25; a hydration mechanism
+  mislabelled in the ledger; a reasoning gap that ignored the repo's own prediction); two `nit`
+  (nine URL keys not eight; a `~62` left behind by an earlier `~58` correction, and an unsourced
+  module-scope count). Every finding cites a `findings.md` line and a re-opened piece of
+  evidence; two carry `provenance: executed`.
+- Cross-examination: every ruling `VALID`; three re-grades, each accepted by the asserter's one
+  `CLARIFY` turn; the crossed re-grade on the duplicate pair merged under the lowest id at the
+  stricter severity, as § Debate rules says. No finding went to turns or a judge.
+- The printed report matched the plan's expectation: the Answer unchanged, the critique table,
+  "Disputed: none", how the critique ended (one round, `K = 0`, 2 of 24 agents), the note that
+  the author never answered, and a pointer that the existing Confluence draft repeats two of the
+  corrected figures.
+
+**Task 6 step 2, the gate in a live agent.** `verify-quote.sh` ran six times from a critic and
+returned `MATCH` each time (allowed); `git grep … <sha> -- <paths>` at the pinned SHA was the
+critics' main instrument (allowed). No critic attempted a denied command, so no denial was
+exercised live; the §2i matrix (18 rows for the two research types) is the evidence for denials.
+
+**Task 6 step 3, the live `standard` run:** not yet run; the owner runs the next `/research`
+interactively and this section gains its result.
+
+**Lessons recorded by the run itself:** "prep for version N+1" research pins its evidence
+rigorously, but to the installed version N — the critics' `scope-and-decisions` and
+`argument-first` checks are what caught it.
