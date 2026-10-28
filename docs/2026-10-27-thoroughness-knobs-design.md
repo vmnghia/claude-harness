@@ -1,6 +1,6 @@
 # Thoroughness knobs: width, dry rounds, N-way cross-examination, effort presets
 
-Status: draft for the owner, 2026-10-27. Builder check done.
+Status: approved by the owner 2026-10-27; implemented and merged 2026-10-27 (`3d16b9f`); § Verified below.
 
 ## Intent
 
@@ -315,3 +315,26 @@ The resolved knobs are written into the case file's state block (`knobs:`) and i
 - How the orchestrator stores the previous round's diff for the delta (scratchpad path naming).
 - The exact grep patterns of §5h.
 - Wording of the warnings for invalid flag values and refused singleton widths.
+
+## Verified (2026-10-28)
+
+Fixture: the 2026-10-22 design's throwaway Node project rebuilt per its plan (base commit, three
+planted defects in an uncommitted diff, a decoy guarded one frame up, a planted unrelated spec),
+harness `ac757c1` installed, run headless from the fixture directory. Hunters are opus.
+
+| Step | Result |
+|---|---|
+| 1. No-flag regression, `--no-fix` | **Pass.** Two hunters A/B at `inside-out`/`outside-in`; the state block carries every pre-branch key plus `knobs:` (`standard`), `round`, `round_kind: fix`, `dry_rounds`, `dry_streak`, `dispatched: 2`; the snapshot directory next to the case file; the three planted defects `AGREED` `major` (one with `executed` evidence); a fourth major the fixture carried by accident (`Object.keys(null)` outside the try) found with the base commit as proof; `REVIEWED`. |
+| 3. Width and dry-check, `--effort=thorough --no-fix` | **Width: pass.** Three hunters A–C at `inside-out`, `outside-in`, `time-and-config`; `knobs:` at `thorough` (3/2/1/5/48); each hunter ruled on the two others (38 rulings), a Tally section, two exchanges; `REVIEWED`. **Dry-check: not reachable here, by contract** — with four `AGREED` majors under `--no-fix` the exit is `REVIEWED`, and the orchestrator said so: "a dry check starts only when the exit would be APPROVED". |
+| 2. Delta, probes and the dry loop, `--effort=thorough --max-iter=2 --auto` | **Pass.** Four rounds: `fix` (4 majors) → Coder `IMPLEMENTED` in one pass → fix-verification with `delta:` from the `r1 → r2` snapshots plus `changed_files` (untracked files as whole-file deltas) and a `probed[]` entry on every delta file from every hunter (the orchestrator's probe check: "nothing uncovered", no send-back) → the exit would be `APPROVED`, so dry-check rounds 3 and 4 on rotated angles → **`APPROVED`, ended dry**; `review_iter: 1`, `dry_rounds: 2`, `dispatched: 13`, snapshots `r1`–`r4`. The probes are the positive control the design was built for: hunter C ran the fix-introduced interval parser on sixteen inputs and the manifest guard on nine. |
+| 1b. Fresh-session resume | **Pass, on the explicit file.** A bare `--resume` on the finished step-2 run rebuilt `round`, `review_iter`, `dispatched` and `knobs` from the block, recomputed `tree` (unchanged) and then *declined* to re-run a finished, approved review — sensible, and a gap in § Resume (see follow-ups). `--resume <step-3 file>` with no `--effort`: the tree change was detected, round 1 restarted as `r1b` with three fresh hunters at the block's width, the abandoned attempt's findings `SUPERSEDED`, then two dry-check rounds ending **"dry loop cut at its cap"** — `APPROVED`, 12 of 48. Not exercised: the delta recompute on a resume *inside* a fix-verification round (needs an interrupted run). |
+| 5. Research width | Not run as a dedicated test; the live `/research` of 2026-10-28 (critique design § Verified) exercised the research plumbing at width 1 (`knobs` resolution once, `max_agents` with the reserve, rounds counted once). Width 2 partitioning is unexercised. |
+| 4. Acceptance smoke | Pending the owner's go (real spend on the reviewed project). |
+
+Follow-ups the runs surfaced (none blocking): the duplicate rule says "60 % of the words of
+`issue`" without naming the denominator (the orchestrator took the stricter reading and said
+so); § Resume does not say what a resume of a *finished* case file with a matching tree does
+(the orchestrator reported and stopped; write that down); an orchestrator once pointed one
+hunter's turn message at the proof rules and not the other's, and reported its own slip.
+Headless launches from a controller session are refused by the auto-mode classifier
+("Create Unsafe Agents"); the owner ran each step by hand.
