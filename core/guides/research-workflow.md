@@ -263,8 +263,9 @@ critic's letter plus its own sequence (`A1`, `B2`); the case file prefixes the r
    information. The lead replies with a `REBUTTAL` block (§ Rebuttal); the orchestrator checks
    that the fields each `response` requires exist, appends the block and relays it; it never
    judges content. If the `SendMessage` fails, § Closing the run, "If the lead cannot be
-   resumed", applies from here. When the critique message would carry no finding at all,
-   steps 3–5 are skipped and the synthesis records `rebuttal: not needed`.
+   resumed", applies from here. When the critique message would carry no `AGREED`, open or
+   `CONTESTED` finding (a `CONTESTED` one is sent: the lead may `FIX` it), steps 3–5 are
+   skipped and the synthesis records `rebuttal: not needed`.
 4. **Re-check and turns.** Each asserting critic gets the re-check message: the lead's
    responses on its own findings and the current `findings.md`. A finding's two sides are its
    critic and the lead. The lead takes the designated challenger's seat (the author disputes
@@ -454,7 +455,7 @@ state:
   settled: false                          # true at "critique settled" (no lead: at the end)
   dispatched: <n>                         # the run's dispatches so far (§ Critique, ceiling)
   knobs: {…}                              # as resolved by /research, never re-resolved
-  rebuttal: lead | unavailable
+  rebuttal: lead | unavailable | not needed
   critics: {A: <agent id>, B: <agent id>} # the current round's
   findings:
     - {id: r1-A1, dup: r1-B2, severity: major, target: "#3", state: FIXED, issue: <one line>}

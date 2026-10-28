@@ -59,7 +59,7 @@ reads it when the trigger applies.
 | [ai-workflow.md](./guides/ai-workflow.md) | `/feature-flow`, `/planner`, planner, coder, tester, reviewer (§ Team protocol: the lead is the switchboard; peers message `main` only) | running the team flow or dispatching one of its agents |
 | [code-review.md](./guides/code-review.md) | reviewer | triaging review comments (CodeRabbit or human) |
 | [adversarial-review.md](./guides/adversarial-review.md) | `/adversarial-review`, adversarial-reviewer, review-judge, research-critic, research-judge, coder (findings-only mode), reviewer (§ Finding discipline) | running `/adversarial-review`, or dispatching a hunter or the judge directly |
-| [thoroughness.md](./guides/thoroughness.md) | `/adversarial-review`, `/feature-flow`, `/research`, research-lead, adversarial-reviewer (§ Angles) | parsing `--effort` / `--width` / `--dry` / `--max-agents`, or sizing a dispatch |
+| [thoroughness.md](./guides/thoroughness.md) | `/adversarial-review`, `/feature-flow`, `/research`, research-lead, adversarial-reviewer (§ Angles), research-critic (§ Angles) | parsing `--effort` / `--width` / `--dry` / `--max-agents`, or sizing a dispatch |
 | [agent-skills.md](./guides/agent-skills.md) | — | answering "can you do X / is there a skill for X", or recommending skills |
 
 ## Agents and commands

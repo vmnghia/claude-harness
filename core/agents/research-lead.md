@@ -210,7 +210,8 @@ are `guides/adversarial-review.md` § Critique variants.
        with the critique message (step 8), then the "critique settled" message (step 9); step
        10 follows step 9. Step 8 may not come: when no finding is sent, the next message is
        "critique settled".
-     - `critique: off`, `ANSWERED` / `PARTIAL`: no critique runs; step 10, then return.
+     - `critique: off`, `ANSWERED` / `PARTIAL`: no critique runs; delete the
+       `## Critique` block (or write `not run`); step 10, then return.
      - `AWAITING_HUMAN` / `STOPPED`: return now. No critique runs on `STOPPED`; on
        `AWAITING_HUMAN` it waits for the resume that ends in `ANSWERED` / `PARTIAL`, which then
        returns as above.

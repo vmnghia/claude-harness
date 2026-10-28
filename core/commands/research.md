@@ -60,17 +60,20 @@ Raw arguments: `$ARGUMENTS`.
    `STOPPED` skips it. Critics by
    `Agent` with `subagent_type: "research-critic"`, all of a round in one message
    (`knobs.width.research-critic`, letters from `A`); the judge by `Agent` with
-   `subagent_type: "research-judge"`, one per disputed finding; the lead by `SendMessage` (load
-   its schema with ToolSearch `select:SendMessage` first) to the id in `lead.txt`.
-   Write `<folder>/critique.md` (the contract's case file; this session writes it, no agent
+   `subagent_type: "research-judge"`, one per stalemated `blocker`/`major`; the lead by
+   `SendMessage` (load its schema with ToolSearch `select:SendMessage` first) to the id in
+   `lead.txt`. Write `<folder>/critique.md` (the contract's case file; this session writes it, no agent
    does). A failed send → the no-lead path (`rebuttal: unavailable`).
-6. **Report.** Show the owner the lead's last status block, the one returned after "critique
-   settled" (or, with `rebuttal: unavailable`, its first return), then `findings.md`'s Answer
-   and Next, then the critique table and each `disputed` line (`disputed <id>: <question> —
-   critic: … — lead: …`) on its own line, how the critique ended (the contract's § Closing
-   the run, step 9), and the Confluence draft line. With `rebuttal: unavailable`, add one line
-   saying the author never answered. If `confluence_draft` is set, show its URL and say: "a
-   draft, not published; review it in Confluence and publish it yourself".
+6. **Report.**
+   - With `critique: off`: the lead's final block, Answer, Next, the Confluence draft line —
+     nothing else.
+   - With `critique: on`: show the owner the lead's last status block, the one returned after
+     "critique settled" (or, with `rebuttal: unavailable`, its first return), then `findings.md`'s
+     Answer and Next, then the critique table and each `disputed` line (`disputed <id>: <question>
+     — critic: … — lead: …`) on its own line, how the critique ended (the contract's § Closing the
+     run, step 9), and the Confluence draft line. With `rebuttal: unavailable`, add one line saying
+     the author never answered. If `confluence_draft` is set, show its URL and say: "a draft, not
+     published; review it in Confluence and publish it yourself".
    On `AWAITING_HUMAN`, show the `action` (and the `capture_path`, if set) and say: "do that,
    then run `/research --resume <folder>`".
 
@@ -100,6 +103,11 @@ Raw arguments: `$ARGUMENTS`.
      failures"): "You and your teammates were cut off by <error> at <time>, not by anything in
      the brief. Resume each failed teammate via SendMessage (not a dispatch), have the
      investigator resume its own driver, re-check preconditions, and continue."
+   - `disputed <id>:` rows in `findings.md` Open (a disputed close) → "done: <the owner's
+     answers, one per id>".
+   - `critique.md` at `settled: true` and no `## Critique` in `findings.md` (the "critique
+     settled" send failed) → re-send the "critique settled" message from the state block, then
+     Wait and Report.
    A bare "resume" from the owner in the session that ran the lead means this step for that run's
    folder.
 4. If the send fails (the session that ran the lead has ended), **stop** and tell the owner that the
@@ -114,4 +122,4 @@ Raw arguments: `$ARGUMENTS`.
 knobs as for a new run, `dispatched` starts at 0, and run the critique with this session as
 orchestrator and the owner as the author (`rebuttal: unavailable`, no lead). Dispatch as in
 **New run** step 5. Write `<folder>/critique.md` (`critique-2.md` on collision); never edit
-`findings.md`. Report the critique table and each `disputed` line.
+`findings.md`. Report as **New run** step 6, with `rebuttal: unavailable`.

@@ -83,7 +83,8 @@ author: <agent name or session>
 
 <!-- every kind: the critique's checked-claim table, one row per finding, verdict = its end state;
      a run without findings says `no findings`; names the critique case file
-     (critique.md; guides/research-workflow.md § Critique). -->
+     (critique.md; guides/research-workflow.md § Critique); deleted by the lead with
+     `critique: off`, or written `not run`. -->
 
 | Claim (quoted) | Verdict | Severity | Evidence |
 |---|---|---|---|
