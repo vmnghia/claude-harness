@@ -408,8 +408,20 @@ returned `MATCH` each time (allowed); `git grep … <sha> -- <paths>` at the pin
 critics' main instrument (allowed). No critic attempted a denied command, so no denial was
 exercised live; the §2i matrix (18 rows for the two research types) is the evidence for denials.
 
-**Task 6 step 3, the live `standard` run:** not yet run; the owner runs the next `/research`
-interactively and this section gains its result.
+**Task 6 step 3, the live `standard` run (2026-10-28, a `kind: codebase` question on an SDK
+migration, interactive session, ~52 min end to end, the critique ~26 min of it).** The whole path
+ran: the lead's capsule carried `critique: on` and `max_agents: 20` (the 24 ceiling minus the
+reserve of 4); its first return left `findings.md` at `status: open`; two critics raised 12
+findings, 9 after duplicate merging (3 `same_as` pairs merged under the lowest id at the stricter
+severity); the lead answered all 12 with `FIX` (`edit:` on every response, no `MAINTAIN`,
+`OUTSIDE_RUN` or re-dispatch), the critics accepted all 12 on re-check (`ACCEPT` ×12), no turns, no
+judge, nothing disputed; the lead wrote `## Critique` (9 rows, all `FIXED`, with the two critics'
+ACCEPT notes applied), four Lessons rows (two of them "step 5 should have caught this"),
+re-derived `ANSWERED` → `settled`, and wrote no Confluence draft (no Decisions row). `critique.md`
+closed at `settled: true`, `rebuttal: lead`, `dispatched: 4`. No gate denial in either log.
+The two `major` findings changed the build recommendation: the proposed v3 port silently stops
+retrying body-phase GET failures that v2 retries (shown by the run's own stall logs), and an
+unmerged branch already rewrites the file the port targets.
 
 **Lessons recorded by the run itself:** "prep for version N+1" research pins its evidence
 rigorously, but to the installed version N — the critics' `scope-and-decisions` and
