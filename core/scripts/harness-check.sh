@@ -744,6 +744,12 @@ awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{exit} f' "$AG/web-reader.md" | grep -q 
 awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{exit} f' "$AG/web-reader.md" | tr '\n' ' ' | grep -qE 'PreToolUse: *- matcher: *"?SubagentHandback"? *hooks: *- type: command *command: *[^ ]*quote-verify-gate\.sh' \
   && ok "web-reader frontmatter gates SubagentHandback (PreToolUse)" \
   || fail "web-reader frontmatter doesn't gate SubagentHandback with quote-verify-gate.sh"
+# 2026-11-04 live run: two quotes from a GitHub /blob/ page failed (HTML around the code), the
+# raw.githubusercontent.com URL matched. web-reader cites raw file URLs for repo source files.
+sed -n '/^## Quotes are checked$/,/^## Output$/p' "$AG/web-reader.md" | grep -qF 'raw.githubusercontent.com' \
+  && sed -n '/^## Quotes are checked$/,/^## Output$/p' "$AG/web-reader.md" | grep -qF '/-/raw/' \
+  && ok "web-reader § Quotes are checked: cite raw file URLs (GitHub and GitLab)" \
+  || fail "web-reader § Quotes are checked lacks the raw-file-URL rule for GitHub/GitLab sources"
 check "rules/delegation.md exists" test -f "$H/rules/delegation.md"
 check "delegation.md indexed in .claude/CLAUDE.md" grep -q "rules/delegation.md" "$H/CLAUDE.md"
 for a in searcher web-reader; do

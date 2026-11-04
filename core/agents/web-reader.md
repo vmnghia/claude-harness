@@ -82,6 +82,10 @@ checks that your `quote` is a verbatim substring of the page (2026-10-16). Markd
 syntax from WebFetch (`|` table pipes, `**`, backticks, links) and whitespace are ignored;
 every word, number and letter's case must match.
 
+- **Source files: cite the raw file.** For a file in a GitHub or GitLab repo, fetch, quote and
+  cite its raw URL at the pinned tag: `https://raw.githubusercontent.com/<owner>/<repo>/<tag>/<path>`
+  or `https://gitlab.com/<group>/<repo>/-/raw/<tag>/<path>`, never the `/blob/` page. The blob
+  page is HTML around the code, so a quote taken from it rarely matches what the hook fetches.
 - Copy text exactly. Never reword, merge two sentences, fix a typo, or elide with `…`: each
   `quote` is one contiguous span of the page. Need two spans? Make two `sources[]` entries.
 - If the hook blocks you, for each failing entry either re-fetch with a WebFetch prompt asking
