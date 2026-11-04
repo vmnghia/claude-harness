@@ -335,6 +335,10 @@ Follow-ups the runs surfaced (none blocking): the duplicate rule says "60 % of t
 `issue`" without naming the denominator (the orchestrator took the stricter reading and said
 so); § Resume does not say what a resume of a *finished* case file with a matching tree does
 (the orchestrator reported and stopped; write that down); an orchestrator once pointed one
-hunter's turn message at the proof rules and not the other's, and reported its own slip.
+hunter's turn message at the proof rules and not the other's, and reported its own slip. All three
+closed 2026-11-04 (`fix/adversarial-contract-followups`): the denominator is the shorter
+`issue`; the case file appends `## Final`, and a resume of a file holding it with a matching tree
+reports and stops unless the file was named explicitly; both sides' turn messages carry the same
+pointers.
 Headless launches from a controller session are refused by the auto-mode classifier
 ("Create Unsafe Agents"); the owner ran each step by hand.

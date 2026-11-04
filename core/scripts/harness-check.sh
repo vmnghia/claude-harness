@@ -1245,6 +1245,20 @@ for tok in time-and-config claims-and-consumers hunter-H probed cycle; do
   grep -qF -- "$tok" "$HUNTER" 2>/dev/null && ok "adversarial-reviewer mentions $tok" || fail "adversarial-reviewer never mentions $tok"
 done
 
+# contract follow-ups from the 2026-10-28 verification (knobs design § Verified)
+printf '%s\n' "$LOOP" | grep -qF 'of the shorter `issue`' \
+  && ok "adversarial-review.md § The loop: sameness names its denominator (the shorter issue)" || fail "adversarial-review.md § The loop: 60 % of which issue's words is unnamed"
+sed -n '/^## Case file/,/^## Tool boundaries/p' "$AR" 2>/dev/null | grep -qF '`## Final`' \
+  && ok "adversarial-review.md § Case file appends ## Final" || fail "adversarial-review.md § Case file never appends the final block (## Final)"
+RES=$(sed -n '/^### Resume/,/^## Case file/p' "$AR" 2>/dev/null | tr '\n' ' ' | sed 's/  */ /g')
+for tok in '`## Final`' 'report its status and stop' 'named explicitly'; do
+  printf '%s\n' "$RES" | grep -qF -- "$tok" && ok "adversarial-review.md § Resume on a finished case file: $tok" || fail "adversarial-review.md § Resume on a finished case file lacks: $tok"
+done
+sed -n '/^## Resume/,/^## /p' "$H/commands/adversarial-review.md" 2>/dev/null | tr '\n' ' ' | sed 's/  */ /g' | grep -qF 'named explicitly' \
+  && ok "commands/adversarial-review.md Resume stops on a finished case file unless named explicitly" || fail "commands/adversarial-review.md Resume re-runs a finished case file"
+sed -n '/^## Debate rules/,/^### End states/p' "$AR" 2>/dev/null | tr '\n' ' ' | sed 's/  */ /g' | grep -qF 'carry the same pointers' \
+  && ok "adversarial-review.md § Debate rules: both sides' turn messages carry the same pointers" || fail "adversarial-review.md § Debate rules lets one side get pointers the other does not"
+
 # commands carry the shared flags (task 3); research.md joins the loop in task 4
 FF="$H/commands/feature-flow.md"
 for c in adversarial-review feature-flow research; do

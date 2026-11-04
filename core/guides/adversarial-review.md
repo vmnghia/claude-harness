@@ -202,7 +202,9 @@ is a `major` until someone reads or runs the missing piece.
     `UNCLEAR`. The other rulings on the finding are attached verbatim to the first turn message
     as evidence; their authors take no turns on it. Wherever this guide says "the other side",
     "both sides" or "both hunters" about one finding, it means the asserter and its designated
-    challenger, and the judge gets those two positions.
+    challenger, and the judge gets those two positions. Turn messages to both sides carry the
+    same pointers: a guide section or rule cited to one side in a turn (say, § Proof for
+    `blocker` and `major`) is cited to the other in that turn too.
 
   At `N = 2` each finding has one ruling and its author is the designated challenger: the
   two-hunter protocol, except that an `UNCLEAR` on a `minor`/`nit` now gets the asserter's one
@@ -637,8 +639,8 @@ judge and Coder dispatch counts once toward `max_agents` (`thoroughness.md § Co
 1. **Circuit breaker** (after synthesis, before any fix dispatch):
    - *Fix did not take*: this round's `AGREED` `blocker`/`major` set is the same as the previous
      round's. Two findings are the same when they share `file`, their lines differ by at most 5,
-     and at least 60 % of the words of `issue` are shared after lowercasing and collapsing
-     whitespace.
+     and at least 60 % of the words of the shorter `issue` are shared after lowercasing and
+     collapsing whitespace.
    - *Coder could not act*: the previous Coder reply was `BLOCKED`, or `IMPLEMENTED` with an
      empty `changed_files`, or a finding the judge had upheld came back in `not_applicable` a
      second time. A rejection the judge refuted is Coder being right, never a stall.
@@ -752,7 +754,9 @@ about $X": `M` is the bound on rounds from `thoroughness.md § Dry rounds`, `W` 
 ### Resume
 
 `--resume [<case-file>]`: read the state block of the given file, else the newest
-`.claude/runs/*-adversarial-*.md`. Recompute `tree`. If it differs, say so and restart the
+`.claude/runs/*-adversarial-*.md`. Recompute `tree`. A case file that holds `## Final` is
+finished: when `tree` matches, report its status and stop unless the file was named explicitly.
+If it differs, say so and restart the
 current round on the new tree. Either way, start the current round again with **fresh** hunters
 from the recorded `round_kind`, `review_iter`, `dry_rounds`, `dry_streak`, `dispatched` and
 `knobs` and the recorded states of earlier rounds; nothing but `tree` is recomputed (`knobs` is
@@ -815,7 +819,8 @@ B`, `### Cross-examination B on A` at width 2), `### Exchange k` (the asserter's
 designated challenger's turn replies), `### Judge <finding id>` (capsule summary, ruling, the
 hunters' turns, the reply),
 `### Synthesis` (the table), `### Owner` (questions and answers), `### Coder` (its block). Every
-block is appended as the agent wrote it.
+block is appended as the agent wrote it. When the review ends, `## Final` holds the
+orchestrator's final block (§ Orchestrator, final).
 
 ## Tool boundaries
 

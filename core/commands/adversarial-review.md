@@ -83,7 +83,9 @@ Raw arguments: `$ARGUMENTS`. Parse out:
    `git diff <base>` **and** every untracked, non-ignored file, since a fix to a new file never
    shows in `git diff`. If it differs from the
    recorded value, say "the tree changed since the case file was written" and **restart** the
-   current round on the new tree. If it matches, restart the current round anyway, with fresh
+   current round on the new tree. If it matches and the case file holds `## Final`, it is
+   finished: report its status and stop unless the file was named explicitly (guide § Resume).
+   Otherwise, if it matches, restart the current round anyway, with fresh
    hunters: mid-round debate state is never restored.
 3. Keep `review_iter` and every earlier round's finding states from the block. Continue the loop
    from there.
