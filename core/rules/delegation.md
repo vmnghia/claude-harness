@@ -40,13 +40,15 @@ Without a lead, the main session applies the lead's routing table itself:
 
 - `searcher` `NOT_FOUND` **without** a `positive_control` is invalid: re-dispatch asking for it.
 - `web-reader` `sources[]` are **hook-verified**: `quote-verify-gate.sh` re-fetched each URL raw
-  and matched the quote verbatim before the agent could finish. Cite only from `sources[]`.
+  and matched the quote verbatim before the agent could finish or hand back. Cite only from
+  `sources[]`.
 - `unverified[]` is **never citable**. To use one, run
   `bash .claude/scripts/verify-quote.sh <url> "<quote>"` yourself (prints `MATCH` /
   `NO MATCH` / `UNCHECKABLE: …`), or read the page.
-- **The escape hatch.** After 3 blocks the hook lets the agent stop anyway. Before citing a
-  `web-reader` result, check: `grep -c '<agentId> ESCAPE' .claude/runs/quote-verify.log`.
-  Non-zero means treat its whole `sources[]` as `unverified[]`.
+- **Check the log before citing.** After 3 blocks the hook lets the agent stop anyway, and a
+  gate that never ran leaves no line at all. Before citing a `web-reader` result, run
+  `grep -E '<agentId> (PASS|ESCAPE)' .claude/runs/quote-verify.log`. Cite its `sources[]` only
+  when there is a `PASS` line and no `ESCAPE` line; otherwise treat them as `unverified[]`.
 - Labels: `searcher` hits are `read (working tree)`; pin a commit yourself if the claim needs it.
 
 ## Runner briefs

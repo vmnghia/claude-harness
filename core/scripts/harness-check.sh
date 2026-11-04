@@ -671,6 +671,8 @@ echo "== 5c. Quote verification + standalone delegation (2026-10-16) =="
 # What this can't prove: that the hook FIRES. Agent files load at session start, so test that
 # with a fresh process, e.g. `claude -p --model claude-haiku-5-5 --allowedTools Agent,WebFetch
 # "dispatch web-reader with <brief>"`, then look for the agent id in .claude/runs/quote-verify.log.
+# The hand-back gate needs a BACKGROUND web-reader (it delivers through SubagentHandback): look
+# for "<id> PASS <n> sources (handback)" or a BLOCK line naming the SubagentHandback message.
 VQ="$H/scripts/verify-quote.sh"
 QG="$H/hooks/quote-verify-gate.sh"
 for f in "$VQ" "$QG"; do
@@ -712,11 +714,36 @@ qg 2 "!!js/function tag is rejected"    q5 "$(printf -- "---\nagent: web-reader\
 for i in 1 2 3; do qg 2 "cap: block $i/3" q6 "$(sb 'getFoo may only be exported by pages')"; done
 qg 0 "cap: 4th stop escapes"            q6 "$(sb 'getFoo may only be exported by pages')"
 grep -q "q6 ESCAPE" "$QT/log" 2>/dev/null && ok "quote-gate: escape is logged" || fail "quote-gate: escape not logged"
+# 2026-11-04: background web-readers deliver through SubagentHandback, after which a Stop block
+# changes nothing; quotes reached callers unchecked in five research runs (2026-10-21 to 11-04).
+# The gate also runs as PreToolUse on SubagentHandback and reads tool_input.message.
+qgh() { # qgh <expected-exit> <label> <agent-id> <handback message> [tool name]
+  local got
+  node -e 'process.stdout.write(JSON.stringify({agent_id:process.argv[1],hook_event_name:"PreToolUse",tool_name:process.argv[3],tool_input:{message:process.argv[2]}}))' "$3" "$4" "${5:-SubagentHandback}" \
+    | TMPDIR="$QT" QV_LOG="$QT/log" CLAUDE_PROJECT_DIR="$ROOT" "$QG" >/dev/null 2>&1
+  got=$?
+  [ "$got" -eq "$1" ] && ok "quote-gate: $2 → exit $got" || fail "quote-gate: $2 → exit $got, expected $1"
+}
+qgh 0 "handback with a verbatim quote passes"      h1 "Summary for the caller.
+$(sb 'It runs on the server and never in the browser')"
+qgh 2 "handback with a paraphrase blocks"          h2 "$(sb 'getFoo may only be exported by pages')"
+qgh 2 "handback without the status block blocks"   h3 "Status: GATHERED. Sources verified above."
+qgh 0 "PreToolUse on another tool passes"          h4 "anything" WebFetch
+qg 0 "Stop after a gated handback passes"          h1 "Report delivered."
+qg 2 "Stop with no handback and no block blocks"   h5 "Report delivered."
+qg 2 "sources[] as a placeholder string blocks"    q7 "$(printf -- '---\nagent: web-reader\nstatus: GATHERED\npayload:\n  sources: "see list above"\n---\n')"
+qg 2 "payload without sources[] blocks"            q8 "$(printf -- '---\nagent: web-reader\nstatus: GATHERED\npayload:\n  unverified: []\n---\n')"
+grep -q "q1 PASS 1 source" "$QT/log" 2>/dev/null && ok "quote-gate: a pass is logged with its count" || fail "quote-gate: a pass leaves no log line"
+grep -q "q4 PASS 0 sources" "$QT/log" 2>/dev/null && ok "quote-gate: an empty pass is logged too" || fail "quote-gate: an empty pass leaves no log line"
+grep -q "h1 PASS 1 source (handback)" "$QT/log" 2>/dev/null && ok "quote-gate: a handback pass names the handback" || fail "quote-gate: a handback pass is not logged as one"
 rm -rf "$QT"
 
 awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{exit} f' "$AG/web-reader.md" | grep -q 'quote-verify-gate.sh' \
   && ok "web-reader frontmatter registers quote-verify-gate" \
   || fail "web-reader frontmatter doesn't register quote-verify-gate.sh"
+awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{exit} f' "$AG/web-reader.md" | tr '\n' ' ' | grep -qE 'PreToolUse: *- matcher: *"?SubagentHandback"? *hooks: *- type: command *command: *[^ ]*quote-verify-gate\.sh' \
+  && ok "web-reader frontmatter gates SubagentHandback (PreToolUse)" \
+  || fail "web-reader frontmatter doesn't gate SubagentHandback with quote-verify-gate.sh"
 check "rules/delegation.md exists" test -f "$H/rules/delegation.md"
 check "delegation.md indexed in .claude/CLAUDE.md" grep -q "rules/delegation.md" "$H/CLAUDE.md"
 for a in searcher web-reader; do

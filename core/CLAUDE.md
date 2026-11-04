@@ -91,7 +91,7 @@ don't retry, rephrase or work around it.
 | `lock-gate.sh` | PreToolUse(Bash) | while a measurement lock exists, **asks** before another session's heavy command (`project.md` `heavy_commands`); the owner (same `session_id`) and its subagents pass; fails open |
 | `session-context.sh` | SessionStart | prints branch, dirty files, newest spec+plan, test-runner presence, harness drift, this session's `session=` id, and any active lock |
 | `confluence-draft-gate.sh` | PreToolUse, **in `research-lead.md`'s frontmatter** | research-lead may write Confluence drafts only |
-| `quote-verify-gate.sh` | Stop, **in `web-reader.md`'s frontmatter** | every quote web-reader cites must be a verbatim substring of its page |
+| `quote-verify-gate.sh` | Stop and PreToolUse(`SubagentHandback`), **in `web-reader.md`'s frontmatter** | every quote web-reader cites must be a verbatim substring of its page, checked before the report reaches the caller; every pass is logged |
 | `review-bash-gate.sh` | PreToolUse(Bash) | for calls whose `agent_type` is `adversarial-reviewer`, `review-judge`, `research-critic` or `research-judge` only: allows read-only git and throwaway scripts under the session scratchpad, denies the rest, fails closed; the two research types also get `git grep` and `verify-quote.sh`; every other caller passes |
 
 Hooks read project facts through `hooks/lib/project-config.js` and fall back to defaults when

@@ -1,9 +1,15 @@
 ---
 name: web-reader
-description: Web reader of the research team, also dispatched directly by the main session for any web/docs lookup (rules/delegation.md). Finds public pages and quotes them verbatim with URL, version and read date, pinned to this repo's stack versions; never concludes what the quotes prove. A Stop hook verifies every quote against the raw page. Returns GATHERED / NOT_FOUND / BLOCKED.
+description: Web reader of the research team, also dispatched directly by the main session for any web/docs lookup (rules/delegation.md). Finds public pages and quotes them verbatim with URL, version and read date, pinned to this repo's stack versions; never concludes what the quotes prove. A hook verifies every quote against the raw page before the report reaches the caller. Returns GATHERED / NOT_FOUND / BLOCKED.
 tools: WebFetch, WebSearch
 model: claude-haiku-5-5
 hooks:
+  PreToolUse:
+    - matcher: SubagentHandback
+      hooks:
+        - type: command
+          command: "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quote-verify-gate.sh"
+          timeout: 180
   Stop:
     - hooks:
         - type: command
@@ -70,7 +76,8 @@ live). Pin every source against it.
 
 ## Quotes are checked
 
-When you end, the `quote-verify-gate.sh` hook re-fetches every `sources[]` URL **raw** and
+When you end, and again when you call `SubagentHandback`, the `quote-verify-gate.sh` hook
+re-fetches every `sources[]` URL **raw** and
 checks that your `quote` is a verbatim substring of the page (2026-10-16). Markdown
 syntax from WebFetch (`|` table pipes, `**`, backticks, links) and whitespace are ignored;
 every word, number and letter's case must match.
@@ -85,7 +92,9 @@ every word, number and letter's case must match.
 
 ## Output
 
-End your reply with exactly one status block:
+End your reply with exactly one status block. When you deliver through `SubagentHandback`, its
+`message` is your report: the whole report, ending with that same status block, never a summary
+of it. The hook blocks a hand-back without one.
 
 ```yaml
 ---

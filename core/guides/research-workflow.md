@@ -186,11 +186,11 @@ payload:
    | `BLOCKED` (permanent) | Open, naming who can unblock; continue other branches |
    | `STOPPED` | don't re-send the brief; re-check provenance; the lead's own third hypothesis stops the lead |
    | `AWAITING_HUMAN` | finish independent branches, then the lead returns `AWAITING_HUMAN` with the `action` (+ `capture_path`) |
-   | web-reader `unverified[]` entries, or an `ESCAPE` line for its agent id in `.claude/runs/quote-verify.log` | not a status and not a re-dispatch: those quotes are uncitable. Spot-check the load-bearing ones (step 5) or list them under Open |
+   | web-reader `unverified[]` entries, or no `PASS` line or an `ESCAPE` line for its agent id in `.claude/runs/quote-verify.log` | not a status and not a re-dispatch: those quotes are uncitable. Spot-check the load-bearing ones (step 5) or list them under Open |
 
-   The web-reader's Stop hook (`quote-verify-gate.sh`, its own frontmatter) re-fetches every
-   `sources[]` URL raw and blocks the agent until each quote is a verbatim substring or has been
-   moved to `unverified[]`. It always converges, so a hook block never surfaces as a status.
+   The web-reader's quote gate (`quote-verify-gate.sh`, its own frontmatter, on Stop and before
+   `SubagentHandback`) re-fetches every `sources[]` URL raw and blocks the agent until each quote
+   is a verbatim substring or has been moved to `unverified[]`. It always converges, so a hook block never surfaces as a status.
 
 4. **Resume**: see "Flow and roles" → "Waiting for the owner" and "Infrastructure failures".
 5. **Shared resources.** searcher and web-reader may run in parallel. designer and
@@ -496,7 +496,7 @@ run never starts a critique; it resumes the lead, as today.
 | incident-investigator | ✅ | ✅ capture.md, evidence-*.md | read-only | ✅ repro-driver only | error-tracker reads (Sentry: 5 direct + gated gateway), session-replay reads, issue-tracker reads, SendMessage (resume its driver) |
 | repro-driver | ✅ | — | `ss`, `ps` only (never starts a server) | — | chrome-devtools |
 | searcher | ✅ | — | — | — | — |
-| web-reader | — | — | — | — | WebFetch, WebSearch; Stop hook `quote-verify-gate.sh` in its frontmatter |
+| web-reader | — | — | — | — | WebFetch, WebSearch; `quote-verify-gate.sh` on Stop and PreToolUse(`SubagentHandback`) in its frontmatter |
 | designer | ✅ | ✅ `design/` only | — | — | chrome-devtools subset; `Artifact` only with the owner's approval |
 | writer | ✅ | — | — | — | — |
 | research-critic | Read only (no Grep/Glob) | — | read-only git, scratchpad scripts, `verify-quote.sh` (gated by `review-bash-gate.sh`) | — | WebFetch (re-read a cited URL); no SendMessage |
