@@ -380,6 +380,51 @@ rgate 2 "python3 without -I"       "python3 $RSCR/p.py"
 rgate 2 "heredoc into repo"        "cat > src/x.js <<'EOF'
 x
 EOF"
+# 2026-11-05: step 1 found `<<` in the raw command and ended the body at any line starting with the
+# delimiter, so a fake heredoc hid a real command from every check (reported by a worker session).
+rgate 2 "<< inside double quotes is no heredoc"  "cat \"<<'E'\"
+touch /tmp/pwned
+E"
+rgate 2 "<<- heredoc is not modelled"            "cat <<-'E'
+	E
+touch /tmp/pwned
+E"
+rgate 2 "delimiter 'E'X is EX to bash"           "cat <<'E'X
+EX
+touch /tmp/pwned
+E"
+rgate 0 "body line EOFX does not end the body"   "cat > $RSCR/adv-r1-hunter-A/p.sh <<'EOF'
+EOFX=\$(id)
+EOF"
+rgate 2 "heredoc without its terminator"         "cat > $RSCR/adv-r1-hunter-A/p.sh <<'EOF'
+touch /tmp/pwned"
+rgate 2 "unquoted heredoc delimiter"             "cat > $RSCR/adv-r1-hunter-A/p.sh <<EOF
+x
+EOF"
+rgate 2 "backslash-quoted delimiter not modelled" "cat > $RSCR/adv-r1-hunter-A/p.sh <<\\EOF
+x
+EOF"
+rgate 2 "two heredocs"                           "cat <<'A' > $RSCR/adv-r1-hunter-A/a <<'B'
+x
+A
+y
+B"
+rgate 2 "header quote spans into the body"       "cat <<'E' \"
+\"; touch /tmp/pwned
+E
+echo \""
+rgate 2 "header continues with a backslash"      "cat <<'E' \\
+; touch /tmp/pwned
+x
+E"
+rgate 0 "quoted heredoc, terminator then a command" "cat > $RSCR/adv-r1-hunter-A/p.js <<'EOF'
+console.log(1)
+EOF
+node $RSCR/adv-r1-hunter-A/p.js"
+rgate 2 "quoted heredoc, terminator then touch"  "cat > $RSCR/adv-r1-hunter-A/p.js <<'EOF'
+x
+EOF
+touch /tmp/pwned"
 rgate 2 "redirect into repo"       "git diff > notes.txt"
 rgate 2 "rm -rf"                   "rm -rf src"
 rgate 2 "npm run build"            "npm run build"

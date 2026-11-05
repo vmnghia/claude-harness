@@ -38,7 +38,9 @@
 #     words (the URL and the quote, each one quoted word or an unquoted one without * ? [)
 # Denied: any other command word, any redirect (`&>`, `1&>`, `>|`, `<>` too; every unquoted `>`
 # is checked) outside the scratchpad or /dev/null, `$(`, backticks, `${`, env assignments,
-# unquoted heredocs, a lone `&` (it runs the next command unchecked), process substitution
+# unquoted heredocs and any heredoc but `<<'WORD'` / `<<"WORD"` (no `<<-`; a `<<` inside quotes is
+# text, not a heredoc; the header line must end on its line and the body at a line exactly WORD),
+# a lone `&` (it runs the next command unchecked), process substitution
 # `<(…)` / `>(…)`, unbalanced quotes, `..` in a scratchpad path, and any segment of a compound
 # command that fails the above, and an unquoted word-initial `#` (bash and the quote scan would
 # disagree inside a comment). Fail closed: unreadable input is denied. Every bypass closed on
@@ -145,14 +147,43 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     return "";
   }
 
+  // Index of the first `<<` that bash parses as an operator: outside quotes and not escaped, with the
+  // same quote rules as unquoted(). `<<<` (a here-string) is skipped. -1 when there is none.
+  function heredocAt(s) {
+    var q = "";
+    for (var i = 0; i < s.length; i++) {
+      var c = s[i];
+      if (c === "\\" && q !== "\x27") { i++; continue; }
+      if (q) { if (c === q) q = ""; continue; }
+      if (c === "\x27" || c === "\"") { q = c; continue; }
+      if (c === "<" && s[i + 1] === "<") { if (s[i + 2] === "<") { i += 2; continue; } return i; }
+    }
+    return -1;
+  }
+
   function verdict(cmd, cwd, who) {
-    // 1. Split off a heredoc body: it is script content, scanned for nothing; the delimiter must be quoted.
-    var shell = cmd, m = cmd.match(/<<-?\s*(["\x27]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n/);
-    if (m) {
-      if (!m[1]) return "unquoted heredoc (<<" + m[2] + ") expands shell inside the script; use <<\x27" + m[2] + "\x27";
-      var start = m.index + m[0].length, end = cmd.indexOf("\n" + m[2], start - 1);
-      shell = cmd.slice(0, m.index + m[0].length - 1) + (end >= 0 ? cmd.slice(end + 1 + m[2].length) : "");
-      if (/<</.test(shell.slice(m.index + m[0].length - 1))) return "more than one heredoc";
+    // 1. Split off a heredoc body: it is script content, scanned for nothing. Only one shape is
+    //    modelled, and anything else is denied: an unquoted `<<` (heredocAt) followed by one quoted
+    //    word, `<<\x27EOF\x27` or `<<"EOF"`, that ends the word, and a body that ends at the first line
+    //    exactly equal to it. A `<<` inside quotes is no heredoc to bash (measured 2026-11-05: a
+    //    quoted one hid a real command); `<<-` ends at a tab-indented line; `<<\x27E\x27X` ends at EX.
+    var shell = cmd, at = heredocAt(cmd);
+    if (at >= 0) {
+      var rest = cmd.slice(at);
+      if (/^<<-/.test(rest)) return "<<- heredoc (it ends at a tab-indented line); use <<\x27EOF\x27";
+      var un = rest.match(/^<<\s*([A-Za-z_][A-Za-z0-9_]*)/);
+      if (un) return "unquoted heredoc (<<" + un[1] + ") expands shell inside the script; use <<\x27" + un[1] + "\x27";
+      var m = rest.match(/^<<\s*(["\x27])([A-Za-z_][A-Za-z0-9_]*)\1(?=[ \t;&|<>)]|\n)[^\n]*\n/);
+      if (!m) return "heredoc shape not modelled (only <<\x27WORD\x27 or <<\"WORD\" ending the word)";
+      // The body starts after the logical line, so the header line must end where it ends: no quote
+      // left open and no backslash-newline (either would start the body later than the split here).
+      var hl = rest.slice(0, m[0].length - 1);
+      if (unquoted(hl) === null || /\\$/.test(hl)) return "heredoc header line continues onto the next line (open quote or trailing backslash)";
+      var head = at + m[0].length, lines = cmd.slice(head).split("\n"), n = -1;
+      for (var li = 0; li < lines.length; li++) if (lines[li] === m[2]) { n = li; break; }
+      if (n < 0) return "heredoc without a line that is exactly its terminator " + m[2];
+      shell = cmd.slice(0, head - 1) + (n + 1 < lines.length ? "\n" + lines.slice(n + 1).join("\n") : "");
+      if (/<</.test(shell.slice(at + 2))) return "more than one heredoc";
     }
     // 2. No expansion or substitution anywhere in the shell part.
     if (/\$\(|`|\$\{|\$[A-Za-z_]/.test(shell)) return "command substitution or variable expansion";
