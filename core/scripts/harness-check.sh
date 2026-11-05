@@ -1594,6 +1594,24 @@ done
 U=$(grep -m1 '^argument-hint:' "$RC" 2>/dev/null | sed 's/^argument-hint: //; s/^"//; s/"$//')
 grep -qF -- "Usage: /research $U" "$RC" 2>/dev/null && ok "research.md usage line still matches the argument-hint" || fail "research.md usage line differs from the argument-hint"
 
+echo "== 5j. Host project with \"type\": \"module\" (2026-11-05) =="
+# The harness's .js files are CommonJS. In a project whose root package.json says "type": "module",
+# Node loaded them as ES modules and require() threw: project-config read nothing (git-guard and
+# lock-gate fell back to defaults), js-yaml failed (the quote gate denied every web-reader) and
+# eslint-summary never ran (measured 2026-11-05). .claude/package.json scopes .claude/ back to CommonJS.
+[ "$(node -e 'try{process.stdout.write(String(require(process.argv[1]).type))}catch(e){}' "$H/package.json")" = commonjs ] \
+  && ok "harness ships package.json with \"type\": \"commonjs\"" || fail "harness has no package.json with \"type\": \"commonjs\" (its .js files break in a \"type\": \"module\" project)"
+EH=$(mktemp -d); printf '{"name":"esm-host","type":"module"}\n' > "$EH/package.json"; cp -r "$H" "$EH/.claude"
+printf '# Project facts\n\n```json harness\n{\n  "thoroughness": {"preset": "thorough"}\n}\n```\n' > "$EH/.claude/project.md"
+node -e "require('$EH/.claude/vendor/js-yaml.min.js').load('a: 1')" >/dev/null 2>&1 \
+  && ok "ESM host: vendored js-yaml loads" || fail "ESM host: vendored js-yaml does not load (the quote gate would deny every web-reader)"
+[ "$(CLAUDE_PROJECT_DIR="$EH" node "$EH/.claude/hooks/lib/project-config.js" thoroughness.preset 2>/dev/null)" = thorough ] \
+  && ok "ESM host: project-config reads project.md" || fail "ESM host: project-config reads nothing (hooks fall back to defaults)"
+echo '[]' > "$EH/eslint.json"
+node "$EH/.claude/scripts/eslint-summary.js" "$EH/eslint.json" >/dev/null 2>&1 \
+  && ok "ESM host: eslint-summary runs" || fail "ESM host: eslint-summary does not run"
+rm -rf "$EH"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do
