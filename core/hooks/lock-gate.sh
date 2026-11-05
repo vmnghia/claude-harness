@@ -11,7 +11,7 @@
 # Fail-open: any error, no lock, or malformed input → allow (exit 0, no output). Never exits 2.
 IN=$(cat 2>/dev/null) || exit 0
 DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-CFG="$(dirname "$0")/lib/project-config.js"
+CFG="$(dirname "$0")/lib/project-config.cjs"
 LOCK_REL=$(CLAUDE_PROJECT_DIR="$DIR" node "$CFG" measurement_lock 2>/dev/null)
 LOCK_REL="${LOCK_REL:-.claude/runs/MEASUREMENT-IN-PROGRESS.md}"
 case "$LOCK_REL" in /*) LOCK="$LOCK_REL";; *) LOCK="$DIR/$LOCK_REL";; esac   # an absolute path must not silently disable the gate

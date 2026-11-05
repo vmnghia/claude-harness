@@ -86,7 +86,7 @@ core/                 installed to <repo>/.claude/
                       matching file is touched)
   guides/             task-specific contracts (research, feature workflow, review), Read only by
                       the agents and commands that need them
-  hooks/              enforcement + session context; hooks/lib/project-config.js reads project.md
+  hooks/              enforcement + session context; hooks/lib/project-config.cjs reads project.md
   templates/          spec, findings, capture sheet
   scripts/            harness-check, verify-quote, prune-session
   skills/             bundled skills
@@ -110,5 +110,5 @@ or hook in a fresh `claude -p` session: a running session keeps the agent files 
 
 ## License
 
-MIT, see [LICENSE](./LICENSE). `core/vendor/js-yaml.min.js` is MIT, see
+MIT, see [LICENSE](./LICENSE). `core/vendor/js-yaml.min.cjs` is MIT, see
 [core/vendor/js-yaml.LICENSE](./core/vendor/js-yaml.LICENSE).

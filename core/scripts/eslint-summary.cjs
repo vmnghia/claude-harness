@@ -2,7 +2,7 @@
 /**
  * Prints a fixed-format summary of an `eslint -f json` report, so the runner agent copies
  * numbers instead of counting them (Haiku drops items when it condenses a large set).
- * Usage: node .claude/scripts/eslint-summary.js <eslint.json> [changed-path ...]
+ * Usage: node .claude/scripts/eslint-summary.cjs <eslint.json> [changed-path ...]
  * Exit: 0 summary printed (whatever the lint result) · 64 usage · 65 unreadable report.
  */
 const fs = require('fs')
@@ -16,7 +16,7 @@ const MAX_NOT_LINTED = 20
 
 const [, , reportPath, ...changedArgs] = process.argv
 if (!reportPath) {
-  console.error('usage: eslint-summary.js <eslint.json> [changed-path ...]')
+  console.error('usage: eslint-summary.cjs <eslint.json> [changed-path ...]')
   process.exit(64)
 }
 

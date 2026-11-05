@@ -124,7 +124,7 @@ it was missing at runtime on 2026-10-19 ("No such tool available"). Never depend
     The dispatcher then sends the check as a `grep` step of its own. Never try to page through it.
   - Put up to 10 `report` matches in `key_lines`, each as `line: text`.
 - **Numbers:**
-  - Copy them from a line the command printed (for example the `eslint-summary.js` output). Quote
+  - Copy them from a line the command printed (for example the `eslint-summary.cjs` output). Quote
     the line.
   - **Never count, add up or tally anything yourself.**
   - If the brief wants a number and no command prints it, report `not printed` rather than
@@ -137,7 +137,7 @@ The dispatcher sends lint as two steps (recipe in [`delegation.md`](../rules/del
 
 1. The linter writes JSON to the run folder, with `allowed_exit: [0, 1]`. Exit 1 means "found
    errors", which is a result, not a failure.
-2. `node .claude/scripts/eslint-summary.js` prints the totals, top rules, files with errors and
+2. `node .claude/scripts/eslint-summary.cjs` prints the totals, top rules, files with errors and
    errors in changed files.
 
 Fill `lint` in your status block by copying step 2's printed lines. Step 1's JSON is one huge
@@ -162,7 +162,7 @@ payload:
       log: <run_dir>/step-1.log
       key_lines: []           # "line: text", at most 10
   checks: []                  # each: { name, verdict: pass | fail | unchecked, evidence }
-  lint: null                  # or { summary_lines: [...] }, copied verbatim from eslint-summary.js
+  lint: null                  # or { summary_lines: [...] }, copied verbatim from eslint-summary.cjs
   block_reason: null
 ---
 ```

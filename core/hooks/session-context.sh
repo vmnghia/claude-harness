@@ -15,7 +15,7 @@ if [ -n "$SPEC" ]; then
 fi
 
 # Test runner: the project's marker glob (project.md `test_runner_marker`), else common ones.
-MARKER=$(node "$(dirname "$0")/lib/project-config.js" test_runner_marker 2>/dev/null)
+MARKER=$(node "$(dirname "$0")/lib/project-config.cjs" test_runner_marker 2>/dev/null)
 TESTS="absent"
 for m in ${MARKER:-jest.config.* vitest.config.* playwright.config.* pytest.ini pyproject.toml go.mod}; do
   ls $m >/dev/null 2>&1 && { TESTS="present($m)"; break; }
@@ -34,7 +34,7 @@ fi
 # This session's id (the lock's owner_session) and any measurement lock (hooks/lock-gate.sh asks
 # non-owners before heavy commands while it exists).
 SID=$(printf '%s' "$IN" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).session_id||"")}catch{}})' 2>/dev/null)
-LOCKF=$(node "$(dirname "$0")/lib/project-config.js" measurement_lock 2>/dev/null); LOCKF="${LOCKF:-.claude/runs/MEASUREMENT-IN-PROGRESS.md}"
+LOCKF=$(node "$(dirname "$0")/lib/project-config.cjs" measurement_lock 2>/dev/null); LOCKF="${LOCKF:-.claude/runs/MEASUREMENT-IN-PROGRESS.md}"
 LOCKS=""
 if [ -f "$LOCKF" ]; then
   LOCKS=$(SID="$SID" node -e 'const l=require("fs").readFileSync(process.argv[1],"utf8");const f=k=>((l.match(new RegExp("^[ \\t>*-]*"+k+":[ \\t]*(.*?)[ \\t\\r]*$","m"))||[])[1]||"").trim();

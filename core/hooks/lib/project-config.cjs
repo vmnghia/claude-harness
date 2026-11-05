@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// project-config.js <key> [--regex anchored|token]
+// project-config.cjs <key> [--regex anchored|token]
 // Prints one value from the ```json harness block in <project>/.claude/project.md, so hooks read
 // project facts from the one file a project writes. Prints nothing when the file, the block or the
 // key is missing: every caller has a default. Never throws (hooks must not crash on a bad file).

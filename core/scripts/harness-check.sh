@@ -108,7 +108,7 @@ guard 2 config-shared "git commit -m x"
 printf '```json harness\n{bad json\n```\n' > "$SANDBOX/.claude/project.md"
 git -C "$SANDBOX" switch -qc main
 guard 2 config-broken "git commit -m x"    # unparseable project.md → default list (main is shared)
-check "hooks/lib/project-config.js exists" test -f "$H/hooks/lib/project-config.js"
+check "hooks/lib/project-config.cjs exists" test -f "$H/hooks/lib/project-config.cjs"
 
 echo "== 2c. sentry-read-gate matrix =="
 SGATE="$H/hooks/sentry-read-gate.sh"
@@ -163,7 +163,7 @@ echo "== 2e. lock-gate matrix (2026-10-21) =="
 LG="$H/hooks/lock-gate.sh"
 check "lock-gate.sh exists+executable" test -x "$LG"
 check "lock-gate.sh bash syntax" bash -n "$LG"
-LGT=$(mktemp -d); mkdir -p "$LGT/.claude/runs" "$LGT/.claude/hooks/lib"; cp "$H/hooks/lib/project-config.js" "$LGT/.claude/hooks/lib/"
+LGT=$(mktemp -d); mkdir -p "$LGT/.claude/runs" "$LGT/.claude/hooks/lib"; cp "$H/hooks/lib/project-config.cjs" "$LGT/.claude/hooks/lib/"
 LOCKF="$LGT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
 lgcfg() { if [ -n "$1" ]; then printf '# p\n\n```json harness\n{"heavy_commands": %s}\n```\n' "$1" > "$LGT/.claude/project.md"; else rm -f "$LGT/.claude/project.md"; fi; }
 iso() { MIN="$1" OFF="${2:-0}" node -e 'const off=Number(process.env.OFF||0);const d=new Date(Date.now()+Number(process.env.MIN)*60000);if(!off){console.log(d.toISOString());process.exit()}
@@ -277,7 +277,7 @@ EST=$(mktemp -d); cat > "$EST/r.json" <<JSON
   {"ruleId":null,"severity":1,"message":"File ignored because of a matching ignore pattern","line":0,"column":0},
   {"ruleId":"no-undef","severity":2,"message":"first line\nsecond line","line":2,"column":1}]}]
 JSON
-EO=$(node "$H/scripts/eslint-summary.js" "$EST/r.json" src/w.ts 2>&1); rm -rf "$EST"
+EO=$(node "$H/scripts/eslint-summary.cjs" "$EST/r.json" src/w.ts 2>&1); rm -rf "$EST"
 printf '%s\n' "$EO" | grep -qxF 'RULE (no rule) errors=0 warnings=1' && ok "eslint-summary: a null-rule warning is '(no rule)', not '(parse error)'" || fail "eslint-summary null-rule label: $EO"
 printf '%s\n' "$EO" | grep -qxF 'CHANGED_ERROR src/w.ts:2:1 no-undef first line second line' && ok "eslint-summary: multi-line message collapsed to one line" || fail "eslint-summary multi-line message"
 # runner M10: lint opt-out is a json key, not a Commands row
@@ -290,7 +290,7 @@ grep -E '^\| \[research-workflow\.md\]' "$H/CLAUDE.md" | grep -q 'web-reader' &&
 # lock M1: the lock= field is a snapshot
 grep -qF 'snapshot' "$H/rules/multi-session.md" && ok "multi-session.md says the lock= field is a session-start snapshot" || fail "multi-session.md lacks the snapshot caveat"
 # lock M3 + M6: absolute lock path; missing session_id
-AT=$(mktemp -d); mkdir -p "$AT/.claude/hooks/lib" "$AT/elsewhere"; cp "$H/hooks/lib/project-config.js" "$AT/.claude/hooks/lib/"
+AT=$(mktemp -d); mkdir -p "$AT/.claude/hooks/lib" "$AT/elsewhere"; cp "$H/hooks/lib/project-config.cjs" "$AT/.claude/hooks/lib/"
 printf '# p\n\n```json harness\n{"measurement_lock": "%s/elsewhere/LOCK.md"}\n```\n' "$AT" > "$AT/.claude/project.md"
 printf 'owner_session: X\nowner_name: abs-owner\nexpected_end: 2099-01-01T00:00:00Z\n' > "$AT/elsewhere/LOCK.md"
 AO=$(printf '{"session_id":"Y","tool_input":{"command":"yarn build"}}' | CLAUDE_PROJECT_DIR="$AT" bash "$H/hooks/lock-gate.sh" 2>/dev/null)
@@ -311,7 +311,7 @@ if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then
 fi
 
 echo "== 2h. Review minors, round 3 (2026-10-21) =="
-RT=$(mktemp -d); mkdir -p "$RT/.claude/hooks/lib" "$RT/.claude/runs"; cp "$H/hooks/lib/project-config.js" "$RT/.claude/hooks/lib/"
+RT=$(mktemp -d); mkdir -p "$RT/.claude/hooks/lib" "$RT/.claude/runs"; cp "$H/hooks/lib/project-config.cjs" "$RT/.claude/hooks/lib/"
 printf '# p\n\n```json harness\n{"heavy_commands": ["^(a+)+$", "yarn build"]}\n```\n' > "$RT/.claude/project.md"
 printf 'owner_session: X\nowner_name: o\nexpected_end: 2099-01-01T00:00:00Z\n' > "$RT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
 T0=$(mono_ms); printf '{"session_id":"Y","tool_input":{"command":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!"}}' | CLAUDE_PROJECT_DIR="$RT" timeout 30 bash "$H/hooks/lock-gate.sh" >/dev/null 2>&1; EL=$(( $(mono_ms) - T0 ))
@@ -724,7 +724,7 @@ for f in "$VQ" "$QG"; do
   check "$(basename "$f") exists+executable" test -x "$f"
   check "$(basename "$f") bash syntax" bash -n "$f"
 done
-check "vendored js-yaml loads (hook parses the status block)" node -e "require('$H/vendor/js-yaml.min.js').load('a: 1')"
+check "vendored js-yaml loads (hook parses the status block)" node -e "require('$H/vendor/js-yaml.min.cjs').load('a: 1')"
 PAGE='<html><body><h1>Version support</h1><p>The <code>getFoo</code> function can only be exported from a <strong>page</strong>. It runs on the server and never in the browser, which is why secrets are safe there.</p><table><tr><td>v10.x</td><td>Current</td><td>2026-02-06</td></tr><tr><td>v9.x</td><td>EOL</td><td>2024-04-05</td></tr></table><p>Padding text so the page clears the two hundred character floor for a JS-rendered shell.</p></body></html>'
 DURL="data:text/html;charset=utf-8,$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$PAGE")"
 vq() { # vq <expected-exit> <label> <quote>
@@ -809,7 +809,7 @@ echo "== 5d. Runner: verbatim command runner (2026-10-19) =="
 PT="$ROOT/project-template/project.md"   # exists in the harness source repo only, not once installed
 if [ "$H" = "$ROOT/core" ] && [ -f "$PT" ]; then
   check "project template: Commands has a 'Writes files' column" grep -qF '| Purpose | Command | Notes | Writes files |' "$PT"
-  check "project template: lint recipe names eslint-summary.js" grep -qF 'eslint-summary.js' "$PT"
+  check "project template: lint recipe names eslint-summary.cjs" grep -qF 'eslint-summary.cjs' "$PT"
 else
   echo "  SKIP  project template checks (not the harness source repo)"
 fi
@@ -839,9 +839,9 @@ check "autonomy.md names the lint_on_request_only opt-out" grep -qF 'lint_on_req
 check "CLAUDE.md documents rules/project/" grep -qF 'rules/project/' "$H/CLAUDE.md"
 check "CLAUDE.md documents paths: frontmatter" grep -qF 'paths:' "$H/CLAUDE.md"
 grep -qF 'not** auto-loaded' "$H/CLAUDE.md" && fail "CLAUDE.md still claims rules are not auto-loaded (measured false 2026-10-19)" || ok "CLAUDE.md no longer claims rules aren't auto-loaded"
-ES="$H/scripts/eslint-summary.js"   # optional helper for ESLint projects (2026-10-19)
-check "eslint-summary.js exists+executable" test -x "$ES"
-check "eslint-summary.js syntax" node --check "$ES"
+ES="$H/scripts/eslint-summary.cjs"   # optional helper for ESLint projects (2026-10-19)
+check "eslint-summary.cjs exists+executable" test -x "$ES"
+check "eslint-summary.cjs syntax" node --check "$ES"
 ET=$(mktemp -d)
 cat > "$ET/r.json" <<JSON
 [{"filePath":"$ROOT/src/a.ts","errorCount":1,"warningCount":1,"messages":[
@@ -1397,9 +1397,9 @@ grep -qF -- "Usage: /research $U" "$RC" 2>/dev/null && ok "commands/research.md 
 if [ "$H" = "$ROOT/core" ]; then grep -qF '"thoroughness"' "$ROOT/project-template/project.md" && ok "project-template/project.md documents the thoroughness key" || fail "project-template/project.md lacks the thoroughness key"; fi
 FX=$(mktemp -d); mkdir -p "$FX/.claude"
 printf '# Project facts\n\n```json harness\n{\n  "thoroughness": {"preset": "thorough", "width": {"searcher": 2}}\n}\n```\n' > "$FX/.claude/project.md"
-[ "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.js" thoroughness.width.searcher 2>/dev/null)" = "2" ] && ok "project-config reads thoroughness.width.searcher" || fail "project-config does not read thoroughness.width.searcher"
-[ "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.js" thoroughness.preset 2>/dev/null)" = "thorough" ] && ok "project-config reads thoroughness.preset" || fail "project-config does not read thoroughness.preset"
-[ -z "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.js" thoroughness.max_agents 2>/dev/null)" ] && ok "project-config prints nothing for an absent thoroughness.max_agents" || fail "project-config prints something for an absent thoroughness key"
+[ "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.cjs" thoroughness.width.searcher 2>/dev/null)" = "2" ] && ok "project-config reads thoroughness.width.searcher" || fail "project-config does not read thoroughness.width.searcher"
+[ "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.cjs" thoroughness.preset 2>/dev/null)" = "thorough" ] && ok "project-config reads thoroughness.preset" || fail "project-config does not read thoroughness.preset"
+[ -z "$(CLAUDE_PROJECT_DIR="$FX" node "$H/hooks/lib/project-config.cjs" thoroughness.max_agents 2>/dev/null)" ] && ok "project-config prints nothing for an absent thoroughness.max_agents" || fail "project-config prints something for an absent thoroughness key"
 rm -rf "$FX"
 
 echo "== 5i. Research critique (2026-10-27) =="
@@ -1595,22 +1595,38 @@ U=$(grep -m1 '^argument-hint:' "$RC" 2>/dev/null | sed 's/^argument-hint: //; s/
 grep -qF -- "Usage: /research $U" "$RC" 2>/dev/null && ok "research.md usage line still matches the argument-hint" || fail "research.md usage line differs from the argument-hint"
 
 echo "== 5j. Host project with \"type\": \"module\" (2026-11-05) =="
-# The harness's .js files are CommonJS. In a project whose root package.json says "type": "module",
+# The harness's scripts are CommonJS. In a project whose root package.json says "type": "module",
 # Node loaded them as ES modules and require() threw: project-config read nothing (git-guard and
 # lock-gate fell back to defaults), js-yaml failed (the quote gate denied every web-reader) and
-# eslint-summary never ran (measured 2026-11-05). .claude/package.json scopes .claude/ back to CommonJS.
-[ "$(node -e 'try{process.stdout.write(String(require(process.argv[1]).type))}catch(e){}' "$H/package.json")" = commonjs ] \
-  && ok "harness ships package.json with \"type\": \"commonjs\"" || fail "harness has no package.json with \"type\": \"commonjs\" (its .js files break in a \"type\": \"module\" project)"
+# eslint-summary never ran (measured 2026-11-05). They are .cjs, which Node always loads as
+# CommonJS. Not a .claude/package.json: in a project that does not ignore .claude/, workspace globs,
+# Jest and bundlers would take .claude/ for a package, and ES modules are the default to keep.
+[ ! -e "$H/package.json" ] && ok "harness ships no package.json (.claude/ is no package to workspace tools)" \
+  || fail "harness ships a package.json (workspace tools would take .claude/ for a package)"
+CJ=$(find "$H/hooks" "$H/scripts" "$H/vendor" -name '*.js' 2>/dev/null)
+[ -z "$CJ" ] && ok "no bare .js in hooks/, scripts/, vendor/ (each says .cjs or .mjs)" || fail "bare .js files (the host's package.json decides how they load): $(printf '%s ' $CJ)"
 EH=$(mktemp -d); printf '{"name":"esm-host","type":"module"}\n' > "$EH/package.json"; cp -r "$H" "$EH/.claude"
 printf '# Project facts\n\n```json harness\n{\n  "thoroughness": {"preset": "thorough"}\n}\n```\n' > "$EH/.claude/project.md"
-node -e "require('$EH/.claude/vendor/js-yaml.min.js').load('a: 1')" >/dev/null 2>&1 \
+node -e "require('$EH/.claude/vendor/js-yaml.min.cjs').load('a: 1')" >/dev/null 2>&1 \
   && ok "ESM host: vendored js-yaml loads" || fail "ESM host: vendored js-yaml does not load (the quote gate would deny every web-reader)"
-[ "$(CLAUDE_PROJECT_DIR="$EH" node "$EH/.claude/hooks/lib/project-config.js" thoroughness.preset 2>/dev/null)" = thorough ] \
+[ "$(CLAUDE_PROJECT_DIR="$EH" node "$EH/.claude/hooks/lib/project-config.cjs" thoroughness.preset 2>/dev/null)" = thorough ] \
   && ok "ESM host: project-config reads project.md" || fail "ESM host: project-config reads nothing (hooks fall back to defaults)"
 echo '[]' > "$EH/eslint.json"
-node "$EH/.claude/scripts/eslint-summary.js" "$EH/eslint.json" >/dev/null 2>&1 \
+node "$EH/.claude/scripts/eslint-summary.cjs" "$EH/eslint.json" >/dev/null 2>&1 \
   && ok "ESM host: eslint-summary runs" || fail "ESM host: eslint-summary does not run"
 rm -rf "$EH"
+# project.md is project-owned and the installer never rewrites it, so a harness file it names
+# (the lint recipe names .claude/scripts/eslint-summary.cjs) must still exist after an update.
+stale_paths() { # stale_paths <project.md> <harness dir>: harness paths it names that do not exist
+  grep -oE '\.claude/(hooks|scripts|vendor)/[A-Za-z0-9_./-]+' "$1" 2>/dev/null | sort -u | while read -r p; do
+    [ -e "$2/${p#.claude/}" ] || printf '%s ' "$p"; done
+}
+SPF=$(mktemp -d); printf '| Lint | x | then `node .claude/scripts/eslint-summary.js r.json` |\n' > "$SPF/project.md"
+[ -n "$(stale_paths "$SPF/project.md" "$H")" ] && ok "stale-path check catches a renamed harness file in project.md" || fail "stale-path check misses .claude/scripts/eslint-summary.js"
+rm -rf "$SPF"
+PMD="$H/project.md"; [ "$H" = "$ROOT/core" ] && PMD="$ROOT/project-template/project.md"
+SP_STALE=$(stale_paths "$PMD" "$H")
+[ -z "$SP_STALE" ] && ok "project.md names only harness files that exist" || fail "project.md names harness files that no longer exist (update its commands): $SP_STALE"
 
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true

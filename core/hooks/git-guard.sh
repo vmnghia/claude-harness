@@ -28,7 +28,7 @@ case "$COMMAND" in *git*) ;; *) exit 0 ;; esac
 
 # Global options may sit between `git` and the subcommand (`git -C repo push`, `git -c k=v commit`).
 GITOPTS="([[:space:]]+(-[Cc][[:space:]]+(\"[^\"]*\"|'[^']*'|[^[:space:]]+)|--(git-dir|work-tree|namespace|config-env|exec-path)[[:space:]]+[^[:space:]]+|-[^[:space:]]+))*"
-CFG="$(dirname "$0")/lib/project-config.js"
+CFG="$(dirname "$0")/lib/project-config.cjs"
 SHARED=$(node "$CFG" shared_branches --regex anchored 2>/dev/null)
 SHARED_TOKEN=$(node "$CFG" shared_branches --regex token 2>/dev/null)
 : "${SHARED:=^(main|master|develop|staging|stable|production|release/.+)$}"

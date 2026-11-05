@@ -65,9 +65,9 @@ Split anything longer than 10 minutes into steps.
   marks `Writes files: yes`. The runner refuses both. Recipe (also in `project.md` § Commands):
   ```
   1. <lint> -f json -o <run_dir>/eslint.json              allowed_exit: [0, 1]   timeout_s: 600
-  2. node .claude/scripts/eslint-summary.js <run_dir>/eslint.json $(git diff --name-only <base>) $(git ls-files --others --exclude-standard)
+  2. node .claude/scripts/eslint-summary.cjs <run_dir>/eslint.json $(git diff --name-only <base>) $(git ls-files --others --exclude-standard)
   ```
-  `eslint-summary.js` is an optional helper for ESLint projects. Step 2 prints the following, and
+  `eslint-summary.cjs` is an optional helper for ESLint projects. Step 2 prints the following, and
   the runner copies the lines verbatim:
   - `TOTAL …`
   - the top `RULE` lines

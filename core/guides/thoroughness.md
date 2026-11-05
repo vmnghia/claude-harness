@@ -180,7 +180,7 @@ The adversarial cap flags (`--max-iter` in `/adversarial-review`, `--max-gate-it
 ```
 
 Every key is optional; an absent key means the next layer decides. The main session reads the
-block the way `hooks/lib/project-config.js` does.
+block the way `hooks/lib/project-config.cjs` does.
 
 **Precedence: by layer, then by specificity.** A run flag beats `project.md`, which beats this
 guide. Within one layer a single value (`--width`, `--dry`, `--max-agents`, the adversarial cap

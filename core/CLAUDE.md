@@ -94,10 +94,10 @@ don't retry, rephrase or work around it.
 | `quote-verify-gate.sh` | Stop and PreToolUse(`SubagentHandback`), **in `web-reader.md`'s frontmatter** | every quote web-reader cites must be a verbatim substring of its page, checked before the report reaches the caller; every pass is logged |
 | `review-bash-gate.sh` | PreToolUse(Bash) | for calls whose `agent_type` is `adversarial-reviewer`, `review-judge`, `research-critic` or `research-judge` only: allows read-only git and throwaway scripts under the session scratchpad, denies the rest, fails closed; the two research types also get `git grep` and `verify-quote.sh`; every other caller passes |
 
-Hooks read project facts through `hooks/lib/project-config.js` and fall back to defaults when
-`project.md` is absent. They need `node` ≥18 on `PATH`. `.claude/package.json` (`"type": "commonjs"`) keeps the
-harness's `.js` files CommonJS in a project whose root `package.json` says `"type": "module"`. The quote gate parses YAML with the
-vendored `vendor/js-yaml.min.js` (v4.1.0, MIT).
+Hooks read project facts through `hooks/lib/project-config.cjs` and fall back to defaults when
+`project.md` is absent. They need `node` ≥18 on `PATH`. Its Node scripts are `.cjs`, so they stay CommonJS in a project
+whose root `package.json` says `"type": "module"`; a new one is `.cjs` or `.mjs`, never bare `.js`. The quote gate parses YAML with the
+vendored `vendor/js-yaml.min.cjs` (v4.1.0, MIT).
 
 **Agent files load at session start.** An edit to `agents/*.md`, its frontmatter hooks included,
 reaches only sessions started afterwards. Test agent and hook changes in a fresh `claude -p`.

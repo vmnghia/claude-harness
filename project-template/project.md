@@ -71,7 +71,7 @@ Where `rules/code-conventions.md` and the agents look for things.
 | Build (Coder's gate) | TODO | the full pipeline, not a partial step | no |
 | Dev server (Tester) | TODO | | no |
 | Tests | TODO or `none` | `none` = Coder reports `test_result: n/a` | no |
-| Lint | TODO | report-only, never `--fix`. Through the `runner` agent: `<lint> -f json -o <run_dir>/eslint.json` (allowed exit 0/1), then `node .claude/scripts/eslint-summary.js <run_dir>/eslint.json <changed paths…>` | no |
+| Lint | TODO | report-only, never `--fix`. Through the `runner` agent: `<lint> -f json -o <run_dir>/eslint.json` (allowed exit 0/1), then `node .claude/scripts/eslint-summary.cjs <run_dir>/eslint.json <changed paths…>` | no |
 | Codegen | none | | no |
 
 `Writes files: yes` marks a command that rewrites files in the working tree (an auto-fixing lint, a
