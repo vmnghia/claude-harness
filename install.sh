@@ -67,6 +67,14 @@ ensure_ignore() { # ensure_ignore <repo>: .claude/runs/ holds run logs and revie
   echo '.claude/runs/' >> "$gi"; echo "  .gitignore: added .claude/runs/"
 }
 
+esm_notice() { # esm_notice: in a "type": "module" host, .js under .claude/ loads as ESM (hooks/lib/esm-js.cjs)
+  local o; o=$(node "$DEST/hooks/lib/esm-js.cjs" "$DEST" 2>/dev/null) || return 0
+  printf '%s\n' "$o" | grep -q '^type module' || return 0
+  echo "  notice: package.json says \"type\": \"module\", so a .js under .claude/ loads as an ES module and require() throws."
+  echo "          Write project hooks and scripts there as .cjs (CommonJS) or .mjs; harness-check fails on a .js."
+  printf '%s\n' "$o" | sed -n 's|^esm |          rename to .cjs or .mjs: .claude/|p'
+}
+
 case "$MODE" in
 install)
   [ -f "$MAN" ] && { echo "install: already installed ($MAN). Use --update." >&2; exit 2; }
@@ -86,6 +94,7 @@ install)
   else cp "$SRC/project-template/project.md" "$DEST/project.md"; echo "  project.md: seeded from template, fill in the TODOs"; fi
   write_manifest "$TMP"; rm -f "$TMP"
   ensure_ignore "$(dirname "$DEST")"
+  esm_notice
   echo "installed $(core_files | wc -l) files, version $VERSION, into $DEST"
   echo "next: fill in $DEST/project.md, then run: bash $DEST/scripts/harness-check.sh"
   ;;
@@ -122,6 +131,7 @@ update)
   merge_settings
   write_manifest "$TMP"; rm -f "$TMP"
   ensure_ignore "$(dirname "$DEST")"
+  esm_notice
   echo "update to $VERSION: $NEW new, $UPD replaced, $KEPT kept with .harness-new, $RET retired"
   ;;
 doctor)

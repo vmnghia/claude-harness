@@ -43,5 +43,10 @@ if [ -f "$LOCKF" ]; then
     process.stdout.write(" | lock="+n+" until "+end+(stale?" STALE":"")+(process.env.SID&&os.includes(process.env.SID)?" (yours)":""))' "$LOCKF" 2>/dev/null)
 fi
 
-echo "[harness] branch=${BRANCH} | dirty_files=${DIRTY} | newest_spec=${SPEC:-none} | plan=${PLAN:-none} | tests=${TESTS}${DRIFT}${SID:+ | session=$SID}${LOCKS}"
+# Project .js under .claude/ that loads as an ES module (a "type": "module" host): a hook there fails
+# to load without a word. Rename it .cjs or .mjs (hooks/lib/esm-js.cjs; 2026-11-05).
+ESMJS=$(node "$(dirname "$0")/lib/esm-js.cjs" .claude 2>/dev/null | grep -c '^esm ')
+ESMF=""; [ "${ESMJS:-0}" -gt 0 ] && ESMF=" | esm_js=${ESMJS} (rename .cjs/.mjs)"
+
+echo "[harness] branch=${BRANCH} | dirty_files=${DIRTY} | newest_spec=${SPEC:-none} | plan=${PLAN:-none} | tests=${TESTS}${DRIFT}${ESMF}${SID:+ | session=$SID}${LOCKS}"
 exit 0

@@ -89,14 +89,19 @@ don't retry, rephrase or work around it.
 | `git-guard.sh` | PreToolUse(Bash) | denies commits on and pushes from/to shared branches (`project.md` `shared_branches`), plain `--force`, `--no-verify` |
 | `sentry-read-gate.sh` | PreToolUse(Sentry `execute_sentry_tool`) | allows only read-only Sentry catalog operations; fails closed |
 | `lock-gate.sh` | PreToolUse(Bash) | while a measurement lock exists, **asks** before another session's heavy command (`project.md` `heavy_commands`); the owner (same `session_id`) and its subagents pass; fails open |
-| `session-context.sh` | SessionStart | prints branch, dirty files, newest spec+plan, test-runner presence, harness drift, this session's `session=` id, and any active lock |
+| `session-context.sh` | SessionStart | prints branch, dirty files, newest spec+plan, test-runner presence, harness drift, project `.js` under `.claude/` that loads as an ES module (`esm_js=`), this session's `session=` id, and any active lock |
 | `confluence-draft-gate.sh` | PreToolUse, **in `research-lead.md`'s frontmatter** | research-lead may write Confluence drafts only |
 | `quote-verify-gate.sh` | Stop and PreToolUse(`SubagentHandback`), **in `web-reader.md`'s frontmatter** | every quote web-reader cites must be a verbatim substring of its page, checked before the report reaches the caller; every pass is logged |
 | `review-bash-gate.sh` | PreToolUse(Bash) | for calls whose `agent_type` is `adversarial-reviewer`, `review-judge`, `research-critic` or `research-judge` only: allows read-only git and throwaway scripts under the session scratchpad, denies the rest, fails closed; the two research types also get `git grep` and `verify-quote.sh`; every other caller passes |
 
 Hooks read project facts through `hooks/lib/project-config.cjs` and fall back to defaults when
-`project.md` is absent. They need `node` ≥18 on `PATH`. Its Node scripts are `.cjs`, so they stay CommonJS in a project
-whose root `package.json` says `"type": "module"`; a new one is `.cjs` or `.mjs`, never bare `.js`. The quote gate parses YAML with the
+`project.md` is absent. They need `node` ≥18 on `PATH`. The harness's Node scripts are `.cjs`, so they stay CommonJS in a project
+whose root `package.json` says `"type": "module"`; a new one is `.cjs` or `.mjs`, never bare `.js`.
+**In such a project, hooks and scripts you add under `.claude/` must be `.cjs` or `.mjs` too:** a
+`.js` there loads as an ES module, `require()` throws, and a hook fails without a word (that is
+how git-guard and lock-gate fell back to defaults, 2026-11-05). The installer lists them,
+`session-context` reports `esm_js=`, harness-check §5j fails on them; elsewhere, a project's `.js`
+is its own business. The quote gate parses YAML with the
 vendored `vendor/js-yaml.min.cjs` (v4.1.0, MIT).
 
 **Agent files load at session start.** An edit to `agents/*.md`, its frontmatter hooks included,

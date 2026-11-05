@@ -234,6 +234,10 @@ O=$(sc2 '{"session_id":"abc","source":"startup"}'); printf '%s' "$O" | grep -q '
 printf '%s' "$O" | grep -q 'lock=' && fail "session-context prints lock= with no lock" || ok "session-context: no lock → no lock= field"
 printf 'owner_session: abc\nowner_name: n\nexpected_end: 2099-01-01T00:00:00Z\n' > "$SCT/.claude/runs/MEASUREMENT-IN-PROGRESS.md"
 O=$(sc2 '{"session_id":"abc","source":"resume"}'); { printf '%s' "$O" | grep -q 'lock=n' && printf '%s' "$O" | grep -q '(yours)'; } && ok "session-context shows the lock, marked (yours) for its owner" || fail "session-context lock field: $O"
+printf '%s' "$O" | grep -q 'esm_js=' && fail "session-context prints esm_js= in a CommonJS host" || ok "session-context: CommonJS host → no esm_js= field"
+SCE=$(mktemp -d); mkdir -p "$SCE/.claude/hooks/project"; printf '{"type":"module"}\n' > "$SCE/package.json"; printf '# m\nversion x\n' > "$SCE/.claude/.harness-manifest"; : > "$SCE/.claude/hooks/project/p.js"
+O=$(printf '{}' | CLAUDE_PROJECT_DIR="$SCE" bash "$SCH" 2>/dev/null); printf '%s' "$O" | grep -q 'esm_js=1' && ok "session-context: ESM host with a project .js → esm_js=1" || fail "session-context: no esm_js=1 in: $O"
+rm -rf "$SCE"
 O=$(sc2 '{not json'); RC=$?; { [ "$RC" -eq 0 ] && printf '%s' "$O" | grep -q '^\[harness\]'; } && ok "session-context: malformed stdin still prints its line, exit 0" || fail "session-context malformed stdin: rc=$RC $O"
 T0=$(mono_ms); CLAUDE_PROJECT_DIR="$SCT" timeout 15 bash "$SCH" >/dev/null 2>&1 < <(sleep 20); EL=$(( $(mono_ms) - T0 ))   # <(…): stdin stays open, and bash doesn't wait for it (a pipe would)
 [ "$EL" -lt 5000 ] && ok "session-context returns fast on an open, silent stdin (${EL} ms)" || fail "session-context blocked on an open stdin (${EL} ms) — it must never hang a session start"
@@ -308,6 +312,16 @@ if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then
   for i in 1 2; do printf 'gone\n' > "$IT5/.claude/rules/zz-twice.md"; printf '%s  rules/zz-twice.md\n' "$(printf 'gone\n' | sha256sum | cut -d' ' -f1)" >> "$IT5/.claude/.harness-manifest"; bash "$ROOT/install.sh" --update "$IT5" >/dev/null 2>&1; done
   [ "$(find "$IT5/.claude/.harness-retired" -name 'zz-twice.md*' | wc -l)" = 2 ] && ok "retiring the same path twice into one version keeps both copies" || fail "a second retire overwrote the first copy"
   rm -rf "$IT5"
+  # 2026-11-05: a new project learns at install time that .claude/ scripts must be .cjs/.mjs in an
+  # ESM host, instead of from a failed harness-check (hooks/lib/esm-js.cjs decides what to list)
+  IT6=$(mktemp -d); git -C "$IT6" init -q; printf '{"type":"module"}\n' > "$IT6/package.json"; mkdir -p "$IT6/.claude/hooks/project"; : > "$IT6/.claude/hooks/project/p.js"
+  O6=$(bash "$ROOT/install.sh" "$IT6" 2>&1)
+  { printf '%s' "$O6" | grep -q 'notice:.*"type": "module"' && printf '%s' "$O6" | grep -qF 'hooks/project/p.js'; } && ok "install in an ESM host prints the .cjs/.mjs notice and lists project .js" || fail "install in an ESM host: no notice or no file list"
+  bash "$ROOT/install.sh" --update "$IT6" 2>&1 | grep -qF 'hooks/project/p.js' && ok "install --update in an ESM host lists project .js too" || fail "install --update in an ESM host lists nothing"
+  rm -rf "$IT6"
+  IT7=$(mktemp -d); git -C "$IT7" init -q; mkdir -p "$IT7/.claude/hooks/project"; : > "$IT7/.claude/hooks/project/p.js"
+  bash "$ROOT/install.sh" "$IT7" 2>&1 | grep -q 'notice:' && fail "install in a CommonJS host printed the ESM notice" || ok "install in a CommonJS host: no ESM notice"
+  rm -rf "$IT7"
 fi
 
 echo "== 2h. Review minors, round 3 (2026-10-21) =="
@@ -1603,8 +1617,31 @@ echo "== 5j. Host project with \"type\": \"module\" (2026-11-05) =="
 # Jest and bundlers would take .claude/ for a package, and ES modules are the default to keep.
 [ ! -e "$H/package.json" ] && ok "harness ships no package.json (.claude/ is no package to workspace tools)" \
   || fail "harness ships a package.json (workspace tools would take .claude/ for a package)"
-CJ=$(find "$H/hooks" "$H/scripts" "$H/vendor" -name '*.js' 2>/dev/null)
-[ -z "$CJ" ] && ok "no bare .js in hooks/, scripts/, vendor/ (each says .cjs or .mjs)" || fail "bare .js files (the host's package.json decides how they load): $(printf '%s ' $CJ)"
+# Which .js files are a problem, decided once by hooks/lib/esm-js.cjs (also used by install.sh and
+# session-context.sh): a harness-owned one always (manifest entries, or everything when there is no
+# manifest, as in core/); a project-owned one only where Node would load it as an ES module (its
+# nearest package.json says "type": "module"). runs/, investigations/, .harness-retired/ are skipped.
+EJ="$H/hooks/lib/esm-js.cjs"
+# A session in a freshly installed ESM project must know the rule before anything fails: CLAUDE.md says it.
+tr '\n' ' ' < "$H/CLAUDE.md" | grep -qF 'hooks and scripts you add under `.claude/` must be `.cjs` or `.mjs` too' \
+  && ok "CLAUDE.md tells sessions that project .claude/ scripts are .cjs/.mjs in an ESM host" || fail "CLAUDE.md does not tell sessions the .cjs/.mjs rule for project .claude/ scripts"
+check "hooks/lib/esm-js.cjs exists" test -f "$EJ"
+ejf() { # ejf <label> <expected output, sorted, one "kind path" per line> <root package.json type or -> <setup…>
+  local label="$1" want="$2" ty="$3" d got; shift 3; d=$(mktemp -d); mkdir -p "$d/.claude"
+  [ "$ty" = - ] || printf '{"type":"%s"}\n' "$ty" > "$d/package.json"
+  (cd "$d/.claude" && eval "$@")
+  got=$(node "$EJ" "$d/.claude" 2>&1 | sort | tr '\n' ';'); rm -rf "$d"
+  [ "$got" = "$want" ] && ok "esm-js: $label" || fail "esm-js: $label → '$got' (expected '$want')"
+}
+MANF='printf "# m\nversion x\n%s  hooks/lib/a.js\n" h > .harness-manifest; mkdir -p hooks/lib hooks/project scripts/perf runs; : > hooks/lib/a.js; : > hooks/project/p.js; : > scripts/perf/s.js; : > runs/r.js'
+ejf "non-ESM host: only the harness-owned .js"        "harness hooks/lib/a.js;" -        "$MANF"
+ejf "ESM host: harness and project .js, not runs/"    "esm hooks/project/p.js;esm scripts/perf/s.js;harness hooks/lib/a.js;type module;" module "$MANF"
+ejf "ESM host, project .cjs/.mjs are fine"            "type module;" module 'printf "# m\nversion x\n" > .harness-manifest; mkdir -p hooks/project; : > hooks/project/p.cjs; : > hooks/project/q.mjs'
+ejf "ESM root but .claude/package.json commonjs"      "" module 'printf "# m\nversion x\n" > .harness-manifest; printf "{\"type\":\"commonjs\"}" > package.json; mkdir -p hooks/project; : > hooks/project/p.js'
+ejf "no manifest: every .js is the harness's"         "harness scripts/x.js;" -          'mkdir -p scripts; : > scripts/x.js'
+EJ_OUT=$(node "$EJ" "$H" 2>&1) && EJ_OUT=$(printf '%s\n' "$EJ_OUT" | grep -v '^type ')
+[ -z "$EJ_OUT" ] && ok "no .js that breaks here (harness-owned bare .js, or project .js under an ESM host)" \
+  || fail "these .js files break or will break in a \"type\": \"module\" host; rename them .cjs (CommonJS) or .mjs: $(printf '%s\n' "$EJ_OUT" | tr '\n' ' ')"
 EH=$(mktemp -d); printf '{"name":"esm-host","type":"module"}\n' > "$EH/package.json"; cp -r "$H" "$EH/.claude"
 printf '# Project facts\n\n```json harness\n{\n  "thoroughness": {"preset": "thorough"}\n}\n```\n' > "$EH/.claude/project.md"
 node -e "require('$EH/.claude/vendor/js-yaml.min.cjs').load('a: 1')" >/dev/null 2>&1 \
