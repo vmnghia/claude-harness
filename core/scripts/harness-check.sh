@@ -7,8 +7,10 @@
 # Exit 0 = all green; exit 1 = at least one FAIL (each is printed).
 
 set -u
-H="$(cd "$(dirname "$0")/.." && pwd)"                      # the harness dir: <repo>/.claude or core/
-ROOT="${CLAUDE_PROJECT_DIR:-$(cd "$H/.." && pwd)}"           # the project root (specs, .mcp.json)
+H="$(cd "$(dirname "$0")/.." && pwd -P)"                   # the harness dir: <repo>/.claude or core/
+# the project root (specs, .mcp.json). Physical paths, like the Node scripts see them: a repo reached
+# through a symlink broke the eslint-summary checks (2026-11-06)
+ROOT="$(cd "${CLAUDE_PROJECT_DIR:-$H/..}" 2>/dev/null && pwd -P || printf '%s' "${CLAUDE_PROJECT_DIR:-$H/..}")"
 GUARD="$H/hooks/git-guard.sh"
 CTX="$H/hooks/session-context.sh"
 FAILS=0
@@ -284,6 +286,16 @@ JSON
 EO=$(node "$H/scripts/eslint-summary.cjs" "$EST/r.json" src/w.ts 2>&1); rm -rf "$EST"
 printf '%s\n' "$EO" | grep -qxF 'RULE (no rule) errors=0 warnings=1' && ok "eslint-summary: a null-rule warning is '(no rule)', not '(parse error)'" || fail "eslint-summary null-rule label: $EO"
 printf '%s\n' "$EO" | grep -qxF 'CHANGED_ERROR src/w.ts:2:1 no-undef first line second line' && ok "eslint-summary: multi-line message collapsed to one line" || fail "eslint-summary multi-line message"
+# 2026-11-06: a repo reached through a symlink. The script's root is physical (Node realpaths the
+# main module); a report or a caller using the symlinked path must still match. The file need not
+# exist (a deleted file can still be in a report), so only its existing ancestors are resolved.
+SLD=$(mktemp -d); ln -s "$(cd "$ROOT" && pwd -P)" "$SLD/r"
+cat > "$SLD/r.json" <<JSON
+[{"filePath":"$SLD/r/src/zz-gone.ts","errorCount":1,"warningCount":0,"messages":[{"ruleId":"no-undef","severity":2,"message":"m","line":3,"column":1}]}]
+JSON
+EO=$(node "$H/scripts/eslint-summary.cjs" "$SLD/r.json" src/zz-gone.ts 2>&1); rm -rf "$SLD"
+{ printf '%s\n' "$EO" | grep -qxF 'CHANGED_ERROR src/zz-gone.ts:3:1 no-undef m' && ! printf '%s\n' "$EO" | grep -q '^CHANGED_NOT_LINTED'; } \
+  && ok "eslint-summary: a report path through a symlink to the root matches the changed file" || fail "eslint-summary through a symlink: $(printf '%s' "$EO" | grep -E 'ERROR_FILE|CHANGED' | tr '\n' ' ')"
 # runner M10: lint opt-out is a json key, not a Commands row
 if [ "$H" = "$ROOT/core" ]; then
   grep -qF '"lint_on_request_only"' "$ROOT/project-template/project.md" && ok "template json has lint_on_request_only" || fail "template json lacks lint_on_request_only"
@@ -918,9 +930,9 @@ printf '%s\n' "$EOUT" | grep -q "^CHANGED src/b.ts" && fail "eslint-summary: unc
 printf '%s\n' "$EOUT" | grep -q "^CHANGED_ERROR.*semi" && fail "eslint-summary: a warning listed as CHANGED_ERROR" || ok "eslint-summary: warnings stay out of CHANGED_ERROR"
 node "$ES" >/dev/null 2>&1; [ $? -eq 64 ] && ok "eslint-summary: usage → 64" || fail "eslint-summary: usage exit"
 echo '{not json' > "$ET/bad.json"; node "$ES" "$ET/bad.json" >/dev/null 2>&1; [ $? -eq 65 ] && ok "eslint-summary: bad report → 65" || fail "eslint-summary: bad-report exit"
-MC=$(sed -n '/^function matchesChanged/,/^}/p' "$ES" 2>/dev/null)
+MC=$(sed -n '/^function real(/,/^}/p; /^function matchesChanged/,/^}/p' "$ES" 2>/dev/null)   # matchesChanged calls real()
 if [ -n "$MC" ] && node -e '
-  const path=require("path"); const ROOT=process.argv[1]; '"$MC"'
+  const fs=require("fs"), path=require("path"); const ROOT=process.argv[1]; '"$MC"'
   const t=[["src/a.ts","./src/a.ts",true],["src/c/x.ts","src/c/",true],["src/ab.ts","src/a",false],["src/a.ts",".",false],["src/a.ts","../other/src/a.ts",false]];
   process.exit(t.every(([r,a,e])=>matchesChanged(r,a)===e)?0:1)' "$ROOT" 2>/dev/null
 then ok "eslint-summary: matchesChanged edge cases (./, dir/, boundary, root, outside)"
@@ -982,6 +994,25 @@ echo "== 5e. Loading classes: always / guides / paths (2026-10-21) =="
 # each rule declares its class: `load: always` (class 1) or `paths:` (class 3); class 2 lives in guides/.
 fm() { awk 'NR==1&&/^---$/{f=1;next} f&&/^---$/{exit} f' "$1" 2>/dev/null; }
 fm_has() { fm "$1" | grep -q "^$2:"; }
+# Harness-owned agents. A project may keep its own agents in agents/ (claude-office, 2026-11-06); they are not
+# held to the harness's agent contracts. Installed: the manifest's agents/ entries. Harness repo (no manifest): all.
+owned_agents() { # owned_agents [<H>]
+  local h="${1:-$H}" p
+  if [ -f "$h/.harness-manifest" ]; then
+    grep -vE '^(#|version |source )' "$h/.harness-manifest" | awk '{print $2}' | grep -E '^agents/[^/]+\.md$' | sort \
+      | while IFS= read -r p; do [ -f "$h/$p" ] && echo "$h/$p"; done
+  else ls "$h"/agents/*.md 2>/dev/null; fi
+}
+agent_name() { local n; n=$(fm "$1" | sed -n 's/^name:[[:space:]]*//p' | head -1 | sed "s/[[:space:]]*\$//; s/^[\"']//; s/[\"']\$//"); echo "${n:-$(basename "$1" .md)}"; }
+name_clashes() { # name_clashes [<H>]: one line per project agent whose name: is also a harness agent's (which loads is undefined)
+  local h="${1:-$H}" own f o n
+  own=$(owned_agents "$h")
+  for f in "$h"/agents/*.md; do
+    [ -f "$f" ] || continue; printf '%s\n' "$own" | grep -qxF "$f" && continue
+    n=$(agent_name "$f")
+    while IFS= read -r o; do [ -n "$o" ] && [ "$(agent_name "$o")" = "$n" ] && echo "$(basename "$f") reuses the name '$n' of harness agent $(basename "$o")"; done <<< "$own"
+  done
+}
 paths_of() { fm "$1" | awk '/^paths:/{p=1; sub(/^paths:[ ]*/,"");
     if($0 ~ /^\[/){gsub(/^\[|\][ ]*$/,""); n=split($0,a,","); for(i=1;i<=n;i++){g=a[i]; gsub(/^[ ]*"?|"?[ ]*$/,"",g); if(g!="") print g}; p=0; next}   # flow list
     if($0!=""){gsub(/^"|"$/,""); print}; next}
@@ -1038,9 +1069,19 @@ done
 for g in $(find "$H/guides/project" -name '*.md' 2>/dev/null | sort); do
   grep -qF "$(basename "$g")" "$H/rules/project/guides-index.md" 2>/dev/null && ok "project guide $(basename "$g") is in guides-index.md" || fail "project guide $(basename "$g") missing from rules/project/guides-index.md"
 done
-for a in "$H"/agents/*.md; do
+for a in $(owned_agents); do
   grep -qF 'rules/project/guides-index.md' "$a" && ok "$(basename "$a") is told to read the project guide index" || fail "$(basename "$a") never points at rules/project/guides-index.md"
 done
+NC=$(name_clashes); [ -z "$NC" ] && ok "no project agent reuses a harness agent's name" || while IFS= read -r l; do fail "$l: rename one of them"; done <<< "$NC"
+# fixture: a project agent beside harness agents — only the manifest's agents are owned; a name: clash is caught
+FA=$(mktemp -d); mkdir -p "$FA/agents"
+printf -- '---\nname: tester\n---\n' > "$FA/agents/tester.md"; printf -- '---\nname: coder\n---\n' > "$FA/agents/coder.md"
+printf -- '---\nname: "tester"\n---\n' > "$FA/agents/4-tester.md"; printf -- '---\nname: web-dev\n---\n' > "$FA/agents/3-web-dev.md"
+printf '# m\nversion x\nsource ~/h\n%s  agents/tester.md\n%s  agents/coder.md\n%s  rules/git.md\n' a b c > "$FA/.harness-manifest"
+[ "$(owned_agents "$FA" | xargs -n1 basename | tr '\n' ' ')" = "coder.md tester.md " ] && ok "owned_agents fixture: manifest agents only, project agents left out" || fail "owned_agents fixture: got '$(owned_agents "$FA" | xargs -n1 basename | tr '\n' ' ')'"
+FNC=$(name_clashes "$FA"); { [ "$(printf '%s\n' "$FNC" | grep -c .)" = 1 ] && printf '%s\n' "$FNC" | grep -q "^4-tester.md reuses the name 'tester'"; } && ok "name_clashes fixture: quoted name: clash caught, distinct project agent passes" || fail "name_clashes fixture: got '$FNC'"
+rm "$FA/.harness-manifest"; [ "$(owned_agents "$FA" | grep -c .)" = 4 ] && [ -z "$(name_clashes "$FA")" ] && ok "owned_agents fixture: no manifest (harness repo) owns every agent" || fail "owned_agents fixture: no-manifest case"
+rm -rf "$FA"
 grep -qF 'rules/**/*.md' "$H/agents/reviewer.md" && ok "reviewer reads rules/** recursively (path-scoped and project rules too)" || fail "reviewer globs rules/ non-recursively (misses rules/project/)"
 grep -qE 'Read.*guides/code-review\.md' "$H/agents/reviewer.md" && ok "reviewer Reads guides/code-review.md" || fail "reviewer only mentions guides/code-review.md, never Reads it"
 # fixtures: the real lint functions, run against a fake tree, from a cwd where shell globbing would bite
@@ -1209,7 +1250,7 @@ for a in coder tester reviewer planner; do
   done
   grep -qF 'Without a roster in your capsule, this section does not apply' "$H/agents/$a.md" && ok "$a: no-roster rule" || fail "$a lacks the no-roster rule"
 done
-for f in "$H"/agents/*.md; do
+for f in $(owned_agents); do
   a=$(basename "$f" .md)
   case " coder tester reviewer planner research-lead incident-investigator " in
     *" $a "*) has_tool "$f" SendMessage && ok "$a lists SendMessage" || fail "$a should list SendMessage";;
@@ -1271,7 +1312,7 @@ for hd in "## Knob table" "## Width semantics" "## Presets" "## Input" "## Angle
 done
 KT=$(sed -n '/^## Knob table$/,/^## /p' "$TH" 2>/dev/null)
 trim_cell() { awk -F'|' -v c="$1" 'NR==1{v=$c; gsub(/^[ \t]+|[ \t]+$/,"",v); print v; exit}'; }
-for f in "$H"/agents/*.md; do
+for f in $(owned_agents); do
   a=$(basename "$f" .md); row=$(printf '%s\n' "$KT" | grep -E '^\| `'"$a"'`')
   n=$(printf '%s\n' "$KT" | grep -cE '^\| `'"$a"'`')
   [ "$n" = 1 ] && ok "knob table has exactly one row for $a" || { fail "knob table has $n rows for $a (wants exactly 1)"; continue; }

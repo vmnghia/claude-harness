@@ -8,7 +8,21 @@
 const fs = require('fs')
 const path = require('path')
 
-const ROOT = path.resolve(__dirname, '../..')
+// Physical paths on both sides: Node realpaths the main module, ESLint prints physical paths, but a
+// caller (or a report) may use a symlinked one (a repo reached through a link: measured 2026-11-06).
+const ROOT = fs.realpathSync(path.resolve(__dirname, '../..'))
+// The physical form of a path whose file may be gone: resolve its longest existing ancestor.
+function real(abs) {
+  let head = path.resolve(abs)
+  const tail = []
+  for (;;) {
+    try { return path.join(fs.realpathSync(head), ...tail) } catch (e) { /* not there yet: go up */ }
+    const up = path.dirname(head)
+    if (up === head) return path.resolve(abs)
+    tail.unshift(path.basename(head))
+    head = up
+  }
+}
 const TOP_RULES = 10
 const MAX_ERROR_FILES = 30
 const MAX_CHANGED_ERRORS = 20 // per changed file; the rest become one CHANGED_ERROR_MORE line
@@ -34,12 +48,12 @@ try {
 // A directory argument matches every file under it, on a `/` boundary so `src/a` never matches
 // `src/ab.ts`. `./x`, absolute paths and trailing slashes normalise to the same form.
 function matchesChanged(relPath, arg) {
-  const want = path.relative(ROOT, path.resolve(ROOT, arg)).split(path.sep).join('/')
+  const want = path.relative(ROOT, real(path.resolve(ROOT, arg))).split(path.sep).join('/')
   if (!want || want.startsWith('..')) return false // the repo root itself, or outside the repo
   return relPath === want || relPath.startsWith(`${want}/`)
 }
 
-const rel = (abs) => path.relative(ROOT, abs).split(path.sep).join('/')
+const rel = (abs) => path.relative(ROOT, real(abs)).split(path.sep).join('/')
 const isError = (m) => m.severity === 2
 // A null ruleId is a parse error only when fatal; otherwise it's a rule-less notice (e.g. "file ignored").
 const ruleOf = (m) => m.ruleId || (m.fatal ? '(parse error)' : '(no rule)')
