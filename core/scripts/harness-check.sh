@@ -331,6 +331,29 @@ if [ "$H" = "$ROOT/core" ] && [ -f "$ROOT/install.sh" ]; then
   { printf '%s' "$O6" | grep -q 'notice:.*"type": "module"' && printf '%s' "$O6" | grep -qF 'hooks/project/p.js'; } && ok "install in an ESM host prints the .cjs/.mjs notice and lists project .js" || fail "install in an ESM host: no notice or no file list"
   bash "$ROOT/install.sh" --update "$IT6" 2>&1 | grep -qF 'hooks/project/p.js' && ok "install --update in an ESM host lists project .js too" || fail "install --update in an ESM host lists nothing"
   rm -rf "$IT6"
+  # 2026-11-06: --update wrote <file>.harness-new for every locally edited file on every run, even when
+  # core had not changed it since the version last offered; and it appended .claude/runs/ to a
+  # .gitignore that already ignored .claude/ (reported from an installed project).
+  IT8=$(mktemp -d); git -C "$IT8" init -q; bash "$ROOT/install.sh" "$IT8" >/dev/null 2>&1
+  printf '\nlocal edit\n' >> "$IT8/.claude/rules/git.md"
+  bash "$ROOT/install.sh" --update "$IT8" >/dev/null 2>&1
+  [ ! -e "$IT8/.claude/rules/git.md.harness-new" ] && ok "install --update: a local edit of a file core left unchanged writes no .harness-new" || fail "install --update wrote .harness-new though core left the file unchanged"
+  sed -i "s|^[0-9a-f]\{64\}  rules/git.md\$|$(printf old | sha256sum | cut -d' ' -f1)  rules/git.md|" "$IT8/.claude/.harness-manifest"   # as if core changed it since
+  bash "$ROOT/install.sh" --update "$IT8" >/dev/null 2>&1
+  [ -e "$IT8/.claude/rules/git.md.harness-new" ] && ok "install --update: core changed a locally edited file → .harness-new" || fail "install --update: core changed a locally edited file, no .harness-new"
+  rm -f "$IT8/.claude/rules/git.md.harness-new"; bash "$ROOT/install.sh" --update "$IT8" >/dev/null 2>&1
+  [ ! -e "$IT8/.claude/rules/git.md.harness-new" ] && ok "install --update: the same core version is offered once, not on every run" || fail "install --update offered the same .harness-new again"
+  grep -qxF 'local edit' "$IT8/.claude/rules/git.md" && ok "install --update: the local edit is kept" || fail "install --update overwrote the local edit"
+  rm -rf "$IT8"
+  IT9=$(mktemp -d); git -C "$IT9" init -q; printf '.claude/\n' > "$IT9/.gitignore"; bash "$ROOT/install.sh" "$IT9" >/dev/null 2>&1
+  grep -qxF '.claude/runs/' "$IT9/.gitignore" && fail "install appended .claude/runs/ to a .gitignore that ignores .claude/" || ok "install: .gitignore already ignoring .claude/ is left alone"
+  rm -rf "$IT9"
+  IT11=$(mktemp -d); git -C "$IT11" init -q; printf '.claude/\n' >> "$IT11/.git/info/exclude"; bash "$ROOT/install.sh" "$IT11" >/dev/null 2>&1
+  grep -qxF '.claude/runs/' "$IT11/.gitignore" 2>/dev/null && ok "install: an ignore in .git/info/exclude (not shared) still gets .claude/runs/ in .gitignore" || fail "install trusted .git/info/exclude, which teammates do not share"
+  rm -rf "$IT11"
+  IT10=$(mktemp -d); git -C "$IT10" init -q; bash "$ROOT/install.sh" "$IT10" >/dev/null 2>&1; bash "$ROOT/install.sh" --update "$IT10" >/dev/null 2>&1
+  [ "$(grep -cxF '.claude/runs/' "$IT10/.gitignore")" = 1 ] && ok "install + --update: .claude/runs/ appended exactly once" || fail "install + --update: .claude/runs/ appended $(grep -cxF '.claude/runs/' "$IT10/.gitignore") times"
+  rm -rf "$IT10"
   IT7=$(mktemp -d); git -C "$IT7" init -q; mkdir -p "$IT7/.claude/hooks/project"; : > "$IT7/.claude/hooks/project/p.js"
   bash "$ROOT/install.sh" "$IT7" 2>&1 | grep -q 'notice:' && fail "install in a CommonJS host printed the ESM notice" || ok "install in a CommonJS host: no ESM notice"
   rm -rf "$IT7"

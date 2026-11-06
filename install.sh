@@ -8,8 +8,9 @@
 #              hook registrations into an existing .claude/settings.json; seeds .claude/project.md
 #              from project-template/ only if absent.
 #   --update   re-copies core. A file whose hash still matches the manifest (nobody edited it) is
-#              replaced; an edited file is kept, and the new version is written next to it as
-#              <file>.harness-new for you to merge.
+#              replaced; an edited file is kept, and when core changed it since the version last
+#              installed or offered, the new version is written next to it as <file>.harness-new for
+#              you to merge, once: the manifest then records that version as the file's base.
 #              A file that left core is retired (moved) to .claude/.harness-retired/<version>/
 #              when unedited; an edited one is kept, with a warning.
 #   --doctor   reports edited, missing and outdated files against the manifest and this core, then
@@ -63,6 +64,12 @@ write_manifest() { # write_manifest <file listing "<hash>  <path>" lines>
 ensure_ignore() { # ensure_ignore <repo>: .claude/runs/ holds run logs and review case files; never commit them
   local gi="$1/.gitignore"
   grep -qxF '.claude/runs/' "$gi" 2>/dev/null && return 0
+  # Already ignored by a committed .gitignore (e.g. `.claude/`)? Then nothing to add. Only a repo
+  # .gitignore counts: a global excludes file or .git/info/exclude does not reach teammates (2026-11-06).
+  local src; src=$(git -C "$1" check-ignore -v .claude/runs/ 2>/dev/null | cut -d: -f1 || true)
+  if [ -n "$src" ] && [ "${src#/}" = "$src" ] && [ "$src" != .git/info/exclude ]; then
+    echo "  .gitignore: .claude/runs/ already ignored ($src), nothing added"; return 0
+  fi
   if [ -s "$gi" ] && [ "$(tail -c1 "$gi" | od -An -c | tr -d ' ')" != '\n' ]; then echo >> "$gi"; fi
   echo '.claude/runs/' >> "$gi"; echo "  .gitignore: added .claude/runs/"
 }
@@ -102,16 +109,21 @@ update)
   [ -f "$MAN" ] || { echo "update: no manifest at $MAN. Run a plain install first." >&2; exit 2; }
   OLD_SRC=$(sed -n 's/^source //p' "$MAN" | head -1)
   [ -n "$OLD_SRC" ] && [ "$OLD_SRC" != "$SRC_DISP" ] && echo "  source changed: $OLD_SRC → $SRC_DISP (harness edits now belong in the new source)"
-  TMP=$(mktemp); NEW=0; UPD=0; KEPT=0
+  TMP=$(mktemp); NEW=0; UPD=0; KEPT=0; LOCAL=0
   while read -r f; do
     if [ ! -e "$DEST/$f" ]; then
       mkdir -p "$DEST/$(dirname "$f")"; cp -p "$CORE/$f" "$DEST/$f"; NEW=$((NEW+1))
     elif [ "$(hash "$DEST/$f")" = "$(hash "$CORE/$f")" ]; then :
     elif [ "$(hash "$DEST/$f")" = "$(man_hash "$f")" ]; then
       cp -p "$CORE/$f" "$DEST/$f"; UPD=$((UPD+1))
+    elif [ "$(hash "$CORE/$f")" = "$(man_hash "$f")" ]; then
+      LOCAL=$((LOCAL+1)); echo "$(man_hash "$f")  $f" >> "$TMP"; continue   # edited locally, core unchanged since its base: nothing to merge
     else
-      cp -p "$CORE/$f" "$DEST/$f.harness-new"; KEPT=$((KEPT+1)); echo "  edited locally, kept: $f (new version: $f.harness-new)"
-      echo "$(man_hash "$f")  $f" >> "$TMP"; continue
+      # Edited locally and changed in core: offer the new version once. The manifest records it as the
+      # file's new base, so the next run offers nothing until core changes it again (2026-11-06: every
+      # run rewrote every edited file's .harness-new, even at the same version).
+      cp -p "$CORE/$f" "$DEST/$f.harness-new"; KEPT=$((KEPT+1)); echo "  edited locally, kept: $f (core changed it: merge $f.harness-new, then delete it)"
+      echo "$(hash "$CORE/$f")  $f" >> "$TMP"; continue
     fi
     echo "$(hash "$DEST/$f")  $f" >> "$TMP"
   done < <(core_files)
@@ -132,7 +144,7 @@ update)
   write_manifest "$TMP"; rm -f "$TMP"
   ensure_ignore "$(dirname "$DEST")"
   esm_notice
-  echo "update to $VERSION: $NEW new, $UPD replaced, $KEPT kept with .harness-new, $RET retired"
+  echo "update to $VERSION: $NEW new, $UPD replaced, $KEPT kept with .harness-new, $LOCAL edited locally (core unchanged), $RET retired"
   ;;
 doctor)
   [ -f "$MAN" ] || { echo "doctor: not installed (no $MAN)" >&2; exit 2; }
