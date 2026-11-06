@@ -25,7 +25,7 @@
 #     uniq (at most one file: a second one is written), cut, tr, ls,
 #     find (never -delete/-exec/-execdir/-ok/-okdir/-fprint/-fprint0/-fprintf/-fls), sha256sum,
 #     xargs (only -0 -r -t -x and numeric -n/-P/-L/-s, onto sha256sum/wc/grep/cat),
-#     awk (options -F/-v only; no `>`, system() or `@` in the program), diff, comm, jq, stat,
+#     awk (options -F/-v only; no `>`, `|`, system() or `@` in the program), diff, comm, jq, stat,
 #     basename, dirname, realpath, pwd, date, echo, printf, true, timeout <allowed command>
 #   Option checks read the words as the program receives them (`'-i'` is `-i`), and a long option
 #   is denied when it is a prefix of a denied one: GNU tools expand `sort --outp` to `--output`.
@@ -313,7 +313,9 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
       // gawk -f/-i/-l/-E load code and -o/-p/-d write files; `@f()` calls system() indirectly and
       // @load/@include load code (measured 2026-10-26: `f = "sys" "tem"; @f(…)` ran).
       if ((hit = some(args, /^-[^Fv-]|^--./))) return "awk option " + hit + " (only -F and -v)";
-      if (/[>@]|system\s*\(/.test(args.join(" "))) return "awk program writes or executes (>, system() or @)";
+      // `|` too: `print | "cmd"`, `"cmd" | getline` and gawk `|&` run a command (measured 2026-11-06).
+      // An alternation /a|b/ is denied with it; use grep -E for that.
+      if (/[>|@]|system\s*\(/.test(args.join(" "))) return "awk program writes or executes (>, |, system() or @); for /a|b/ use grep -E";
     }
     if (cw === "xargs") {
       // Only options that take no argument, or a number: one that takes a word (-I, -d, -a, -E, …)

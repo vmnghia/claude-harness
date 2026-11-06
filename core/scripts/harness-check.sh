@@ -571,6 +571,15 @@ rgate 2 "critic: cd elsewhere, then verify-quote"  "cd /srv && bash .claude/scri
 rgate 2 "critic: verify-quote; then touch"         "bash .claude/scripts/verify-quote.sh https://example.com/x 'q'; touch /tmp/pwned" research-critic "$RPROJ"
 rgate 2 "critic: verify-quote unquoted glob piece" "bash .claude/scripts/verify-quote.sh https://example.com/x 'a'*" research-critic "$RPROJ"
 rgate 0 "hunter: grep a quoted ;"                  "grep -n 'a; b' src/x.ts"
+# 2026-11-06: once separators inside quotes stopped splitting (3c4a885), an awk program's own pipe
+# reached the awk branch, which looked only for > @ system(: `print | "cmd"`, `"cmd" | getline` and
+# gawk's `|&` ran any command, unhooked (security review in an installed project).
+rgate 2 "awk print | \"cmd\""          "awk 'BEGIN{print \"x\" | \"id\"}'"
+rgate 2 "awk \"cmd\" | getline"         "awk 'BEGIN{\"id\" | getline x; print x}'"
+rgate 2 "awk |& co-process"            "awk 'BEGIN{print \"x\" |& \"id\"}'"
+rgate 2 "awk system() (control)"       "awk 'BEGIN{system(\"id\")}'"
+rgate 0 "awk print \$1 (control)"      "awk '{print \$1}' package.json"
+rgate 0 "awk getline < file reads"     "awk 'BEGIN{getline l < \"src/a.ts\"; print l}'"
 rgate 2 "hunter: grep, then an unquoted ; touch"   "grep -n 'a' src/x.ts; touch /tmp/pwned"
 rgate 0 "hunter: cd to the project root, then git" "cd $RPROJ && git status" adversarial-reviewer "$RSCR/adv"
 rgate 2 "hunter: cd to a subdir of the root"       "cd $RPROJ/scratch && git status" adversarial-reviewer "$RPROJ"
