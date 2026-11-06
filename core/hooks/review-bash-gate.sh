@@ -13,7 +13,8 @@
 #     whose .git/config runs a command on `git status`
 #   - a throwaway script under the session scratchpad: `node <path>` or `python3 -I <path>`,
 #     where <path> is /tmp/claude-*/…/scratchpad/… without `..`; `cd` and `mkdir -p` to such a
-#     path; a relative script after a `cd` into one
+#     path; a relative script after a `cd` into one; `cd` to exactly the project root
+#     ($CLAUDE_PROJECT_DIR, by realpath), so an agent whose cwd moved into its scratchpad can return
 #   - writing such a script: a redirect, `tee` or a *quoted* heredoc whose targets are all
 #     scratchpad paths
 #   - read-only filters: cat, head, tail, wc, grep, rg (never --pre/--pre-glob/--hostname-bin),
@@ -35,7 +36,9 @@
 #     `.claude/scripts/verify-quote.sh`, optionally behind `./` or an absolute prefix, no `..`, and
 #     its realpath (from the call's cwd) must equal that of $CLAUDE_PROJECT_DIR/.claude/scripts/
 #     verify-quote.sh (a copy elsewhere, a symlink or a missing file is denied); then exactly two
-#     words (the URL and the quote, each one quoted word or an unquoted one without * ? [)
+#     words (the URL and the quote, each built from "…", '…', backslash-escaped characters and
+#     unquoted characters without * ? [, so 'don'\''t' is one word)
+#   Compound commands are split at separators outside quotes only (`grep 'a; b'` is one command).
 # Denied: any other command word, any redirect (`&>`, `1&>`, `>|`, `<>` too; every unquoted `>`
 # is checked) outside the scratchpad or /dev/null, `$(`, backticks, `${`, env assignments,
 # unquoted heredocs and any heredoc but `<<'WORD'` / `<<"WORD"` (no `<<-`; a `<<` inside quotes is
@@ -74,11 +77,20 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
   var GATED = { "adversarial-reviewer":1, "review-judge":1, "research-critic":1, "research-judge":1 };
   // The one script research-critic/research-judge may run, with exactly a URL and a quote after it.
   var VQ_PATH = /^(\.\/|\/[^\s]+\/)?\.claude\/scripts\/verify-quote\.sh$/;
-  var VQ_WORD = "(?:\"[^\"\\\\]*\"|\x27[^\x27\\\\]*\x27|[^\\s\"\x27\\\\*?\\[]+)";
+  // One shell word in pieces, as bash reads it: "…" (no backslash), \x27…\x27, a backslash-escaped
+  // character (\x27don\x27\\\x27\x27t\x27 is one word: measured 2026-11-06), or plain characters without a glob.
+  var VQ_WORD = "(?:\"[^\"\\\\]*\"|\x27[^\x27]*\x27|\\\\\\S|[^\\s\"\x27\\\\*?\\[])+";
   // Where the one allowed script really is: the project root is CLAUDE_PROJECT_DIR (the hook has no git).
+  function projectRoot() { return process.env.CLAUDE_PROJECT_DIR || process.cwd(); }
+  // `cd <project root>` is allowed, so an agent whose cwd moved into its scratchpad can get back to
+  // where the relative script and a repo it may run git in are (measured 2026-11-06).
+  function isRoot(word, cwd) {
+    try { return fs.realpathSync(path.resolve(cwd, word.replace(/^["\x27]|["\x27]$/g, ""))) === fs.realpathSync(projectRoot()); }
+    catch (e) { return false; }
+  }
   function vqPinned(word, cwd) {
     try {
-      var root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+      var root = projectRoot();
       return fs.realpathSync(path.resolve(cwd, word)) === fs.realpathSync(path.join(root, ".claude/scripts/verify-quote.sh"));
     } catch (e) { return false; }
   }
@@ -201,13 +213,23 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     if (/\$["\x27]/.test(bare)) return "$\x27…\x27 / $\"…\" quoting (its escapes hide what the program receives)";
     if (/\{[^\s}]*(,|\.\.)/.test(bare)) return "brace expansion {a,b} / {1..3} (it turns one word into several)";
     var rd = redirects(shell, bare); if (rd) return rd;
-    // 4. Every segment of a compound command must pass. The split ignores quotes, so a separator
-    //    inside quotes only over-splits: the piece after it starts with a quote and is denied.
-    var segs = shell.split(/\n|&&|\|\||;|\|(?!\|)/), cwdScratch = false;
+    // 4. Every segment of a compound command must pass. Separators are found in `bare`, so a `;`,
+    //    `|` or `&&` inside quotes stays in its word (a quote with `;` was split and denied:
+    //    measured 2026-11-06). `bare` has the length of `shell`, so its indices cut `shell`.
+    var segs = [], from = 0;
+    for (var k = 0; k < bare.length; k++) {
+      var two = bare.substr(k, 2);
+      if (two === "&&" || two === "||") { segs.push(shell.slice(from, k)); from = k + 2; k++; }
+      else if (bare[k] === "\n" || bare[k] === ";" || bare[k] === "|") { segs.push(shell.slice(from, k)); from = k + 1; }
+    }
+    segs.push(shell.slice(from));
+    var cwdScratch = false;
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i].trim(); if (!s) continue;
       var r = checkSegment(s, cwdScratch, cwd, who); if (r !== "allow") return r;
-      var cdm = s.match(/^cd\s+(\S+)$/); if (cdm && isScratch(cdm[1])) cwdScratch = true;
+      var cdm = s.match(/^cd\s+(\S+)$/);
+      if (cdm && isScratch(cdm[1])) cwdScratch = true;
+      else if (cdm && isRoot(cdm[1], cwd)) { cwd = projectRoot(); cwdScratch = false; }
     }
     return "allow";
   }
@@ -220,7 +242,7 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     if (cw === "timeout") { w = w.slice(1); while (w.length && /^-|^\d/.test(w[0])) w = w.slice(1); return checkSegment(w.join(" "), cwdScratch, cwd, who); }
     if (research && cw === "bash") {
       var vm = s.match(VQ_CMD);
-      if (!vm || !VQ_PATH.test(vm[1]) || /(^|\/)\.\.(\/|$)/.test(vm[1]) || !vqPinned(vm[1], cwd)) return "bash is allowed only as bash .claude/scripts/verify-quote.sh <url> \x27<quote>\x27 (the project\x27s own script, no .. in the path, exactly two arguments, no unquoted glob)";
+      if (!vm || !VQ_PATH.test(vm[1]) || /(^|\/)\.\.(\/|$)/.test(vm[1]) || !vqPinned(vm[1], cwd)) return "bash is allowed only as bash .claude/scripts/verify-quote.sh <url> \x27<quote>\x27 (the project\x27s own script, no .. in the path, exactly two arguments, no unquoted glob; an apostrophe in the quote is \x27don\x27\\\x27\x27t\x27). From any other directory use the absolute path, bash " + path.join(projectRoot(), ".claude/scripts/verify-quote.sh") + " …, or cd " + projectRoot() + " first";
       return "allow";
     }
     if (cw === "git") {
@@ -251,6 +273,7 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
       if (cw === "mkdir" && args[0] !== "-p") return "mkdir without -p";
       var ops = operands(args);
       if (!ops.length) return cw + " without a scratchpad path";
+      if (cw === "cd" && ops.length === 1 && isRoot(ops[0], cwd)) return "allow";
       for (var o = 0; o < ops.length; o++) if (!isScratch(ops[o])) return cw + " outside the session scratchpad: " + ops[o];
       return "allow";
     }

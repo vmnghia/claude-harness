@@ -523,6 +523,22 @@ rgate 2 "critic: verify-quote abs path with .." 'bash /srv/../.claude/scripts/ve
 rgate 2 "critic: verify-quote glob word" 'bash .claude/scripts/verify-quote.sh https://example.com/x *' research-critic "$RPROJ"
 rgate 2 "critic: verify-quote glob url" 'bash .claude/scripts/verify-quote.sh https://example.com/x? "q"' research-critic "$RPROJ"
 rgate 0 "critic: verify-quote quoted ? url" "bash .claude/scripts/verify-quote.sh 'https://example.com/x?a=1' 'q*'" research-critic "$RPROJ"
+# 2026-11-06: 18 verify-quote calls denied in one research run. A quote with an apostrophe is
+# 'don'\''t' (one word in pieces); a ; | && inside quotes was split as a separator; and a critic whose
+# cwd had moved into its scratchpad could neither run the relative script nor cd back to the root.
+rgate 0 "critic: verify-quote escaped apostrophe" "bash .claude/scripts/verify-quote.sh 'https://example.com/x' 'timers don'\''t run.'" research-critic "$RPROJ"
+rgate 0 "critic: verify-quote ; inside the quote"  "bash .claude/scripts/verify-quote.sh 'https://example.com/x' 'a; b'" research-critic "$RPROJ"
+rgate 0 "critic: verify-quote | && inside the quote" "bash .claude/scripts/verify-quote.sh 'https://example.com/x' 'a | b && c'" research-critic "$RPROJ"
+rgate 0 "critic: cd to the project root, then verify-quote" "cd $RPROJ && bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RSCR/adv"
+rgate 0 "critic: cd \"<project root>\" (quoted)"  "cd \"$RPROJ\" && bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RSCR/adv"
+rgate 2 "critic: relative verify-quote from the scratchpad" "bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RSCR/adv"
+rgate 2 "critic: cd elsewhere, then verify-quote"  "cd /srv && bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RPROJ"
+rgate 2 "critic: verify-quote; then touch"         "bash .claude/scripts/verify-quote.sh https://example.com/x 'q'; touch /tmp/pwned" research-critic "$RPROJ"
+rgate 2 "critic: verify-quote unquoted glob piece" "bash .claude/scripts/verify-quote.sh https://example.com/x 'a'*" research-critic "$RPROJ"
+rgate 0 "hunter: grep a quoted ;"                  "grep -n 'a; b' src/x.ts"
+rgate 2 "hunter: grep, then an unquoted ; touch"   "grep -n 'a' src/x.ts; touch /tmp/pwned"
+rgate 0 "hunter: cd to the project root, then git" "cd $RPROJ && git status" adversarial-reviewer "$RSCR/adv"
+rgate 2 "hunter: cd to a subdir of the root"       "cd $RPROJ/scratch && git status" adversarial-reviewer "$RPROJ"
 rgate 2 "critic: git grep --open-files-in-pager=" "git grep --open-files-in-pager=sh foo abc123" research-critic
 rgate 2 "critic: git grep --open (prefix)" "git grep --open=sh foo abc123" research-critic
 rgate 2 "critic: git grep -nO (cluster)" "git grep -nO sh foo abc123" research-critic

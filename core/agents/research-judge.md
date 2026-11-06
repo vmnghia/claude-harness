@@ -90,7 +90,10 @@ Do not split the difference. A `major` that is really a `blocker` is a wrong rul
   `git grep` at a pinned SHA; `node` / `python3 -I` on a script under your scratchpad
   subfolder, which never writes to the repo, builds, installs or uses the network; the gate's
   read-only filters; and `bash .claude/scripts/verify-quote.sh <url> '<quote>'`, exactly those
-  two arguments.
+  two arguments. Run it from the project root: after a `cd` into your scratchpad, `cd <project root> &&` first or
+  give the script's absolute path (the relative path from elsewhere is denied, since a copy there
+  could be anything). An apostrophe in the quote is `'don'\''t'`; `;`, `|` and `&&` inside the
+  quotes are fine.
 - No new evidence: no web search, no `WebFetch` of a URL the run does not cite.
 - No dispatching, no messaging, no asking for the rest of the debate or the case file.
 - Never read or grep the never-read list: `<folder>/critique*.md`, every investigation folder

@@ -146,8 +146,11 @@ finding without new evidence only exhausts your side.
   (`git show <sha>:<path>`, `git log`, `git ls-files`, …) and `git grep` at a pinned SHA;
   `node` / `python3 -I` on a script you wrote under your scratchpad subfolder, which never
   writes to the repo, builds, installs or uses the network; the gate's read-only filters; and
-  `bash .claude/scripts/verify-quote.sh <url> '<quote>'`, exactly those two arguments. A
-  denial is policy: reformulate within the list, never work around it.
+  `bash .claude/scripts/verify-quote.sh <url> '<quote>'`, exactly those two arguments.
+  Run it from the project root: after a `cd` into your scratchpad, `cd <project root> &&` first or
+  give the script's absolute path (the relative path from elsewhere is denied, since a copy there
+  could be anything). An apostrophe in the quote is `'don'\''t'`; `;`, `|` and `&&` inside the
+  quotes are fine. A denial is policy: reformulate within the list, never work around it.
 - No new evidence. No `searcher`, no new web search, no `WebFetch` of a URL the run does not
   cite. What the run's evidence cannot settle is `unverifiable`, not a reason to go looking.
 - No dispatching: you spawn nothing and message nobody. The orchestrator relays everything.
