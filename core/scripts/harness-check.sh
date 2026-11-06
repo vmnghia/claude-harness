@@ -539,6 +539,29 @@ rgate 0 "hunter: grep a quoted ;"                  "grep -n 'a; b' src/x.ts"
 rgate 2 "hunter: grep, then an unquoted ; touch"   "grep -n 'a' src/x.ts; touch /tmp/pwned"
 rgate 0 "hunter: cd to the project root, then git" "cd $RPROJ && git status" adversarial-reviewer "$RSCR/adv"
 rgate 2 "hunter: cd to a subdir of the root"       "cd $RPROJ/scratch && git status" adversarial-reviewer "$RPROJ"
+# A cd changes where later commands run only when it runs, in this shell, before them: not after
+# | or ||, not before | (a subshell), and after it only && or | (with ; || or a newline the rest
+# runs in the old directory when the cd fails). The gate tracks the cd target as the new cwd, so a
+# relative verify-quote.sh after `cd <scratchpad>` resolves to the scratchpad copy (security review 2026-11-06).
+rgate 2 "critic: cd <root> | relative verify-quote"      "cd $RPROJ | bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RSCR/adv"
+rgate 2 "critic: true || cd <root> && relative vq"       "true || cd $RPROJ && bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RSCR/adv"
+rgate 2 "critic: cd <scratchpad> && relative vq"         "cd $RSCR/adv && bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RPROJ"
+rgate 2 "hunter: cd <missing scratch>; relative node"    "cd $RSCR/nope; node p.js" adversarial-reviewer "$RPROJ"
+rgate 2 "hunter: cd <scratch> && true || relative node"  "cd $RSCR/nope && true || node p.js" adversarial-reviewer "$RPROJ"
+rgate 2 "hunter: cd <scratch> && node p.js, newline, node q.js" "cd $RSCR/adv && node p.js
+node q.js" adversarial-reviewer "$RPROJ"
+rgate 0 "hunter: cd <scratch> && node p.js | head"       "cd $RSCR/adv && node p.js | head -5" adversarial-reviewer "$RPROJ"
+rgate 0 "hunter: grep x; cd <scratch> && node p.js"      "grep -n x src/a.ts; cd $RSCR/adv && node p.js" adversarial-reviewer "$RPROJ"
+# A cd counts only where bash is sure to have run it: in a pipeline it runs in a subshell, after
+# || or ; the next command also runs when the cd failed (security review of 3c4a885, 2026-11-06).
+rgate 2 "critic: cd root | verify-quote (subshell)"  "cd $RPROJ | bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RSCR/adv"
+rgate 2 "critic: cd root || verify-quote"            "cd $RPROJ || bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RSCR/adv"
+rgate 2 "critic: cd root; verify-quote"              "cd $RPROJ; bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RSCR/adv"
+rgate 2 "critic: true || cd root && verify-quote"    "true || cd $RPROJ && bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$RSCR/adv"
+rgate 2 "cd scratchpad | node relative script"       "cd $RSCR/adv-r1-hunter-A | node probe.js"
+rgate 2 "cd scratchpad; node relative script"        "cd $RSCR/adv-r1-hunter-A; node probe.js"
+rgate 0 "cd root && git log | head (pipe after)"     "cd $RPROJ && git log --oneline | head -5" adversarial-reviewer "$RSCR/adv"
+rgate 2 "critic: cd to the root by a relative name"  "cd $(basename "$RPROJ") && bash .claude/scripts/verify-quote.sh https://example.com/x 'q'" research-critic "$(dirname "$RPROJ")"
 rgate 2 "critic: git grep --open-files-in-pager=" "git grep --open-files-in-pager=sh foo abc123" research-critic
 rgate 2 "critic: git grep --open (prefix)" "git grep --open=sh foo abc123" research-critic
 rgate 2 "critic: git grep -nO (cluster)" "git grep -nO sh foo abc123" research-critic

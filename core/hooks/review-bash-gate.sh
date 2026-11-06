@@ -15,6 +15,9 @@
 #     where <path> is /tmp/claude-*/…/scratchpad/… without `..`; `cd` and `mkdir -p` to such a
 #     path; a relative script after a `cd` into one; `cd` to exactly the project root
 #     ($CLAUDE_PROJECT_DIR, by realpath), so an agent whose cwd moved into its scratchpad can return
+#   A `cd` (absolute path only: a relative one follows CDPATH) moves the later commands of the call
+#   only as `cd <path> && …`, never after `|` or `||` and with only `&&` / `|` after it, since bash
+#   would otherwise run them in a subshell, skip the cd, or carry on after a failed one
 #   - writing such a script: a redirect, `tee` or a *quoted* heredoc whose targets are all
 #     scratchpad paths
 #   - read-only filters: cat, head, tail, wc, grep, rg (never --pre/--pre-glob/--hostname-bin),
@@ -216,20 +219,33 @@ VERDICT=$(printf '%s' "$INPUT" | node -e '
     // 4. Every segment of a compound command must pass. Separators are found in `bare`, so a `;`,
     //    `|` or `&&` inside quotes stays in its word (a quote with `;` was split and denied:
     //    measured 2026-11-06). `bare` has the length of `shell`, so its indices cut `shell`.
-    var segs = [], from = 0;
+    var segs = [], seps = [], from = 0;   // seps[i]: the separator after segs[i] ("" at the end)
     for (var k = 0; k < bare.length; k++) {
       var two = bare.substr(k, 2);
-      if (two === "&&" || two === "||") { segs.push(shell.slice(from, k)); from = k + 2; k++; }
-      else if (bare[k] === "\n" || bare[k] === ";" || bare[k] === "|") { segs.push(shell.slice(from, k)); from = k + 1; }
+      if (two === "&&" || two === "||") { segs.push(shell.slice(from, k)); seps.push(two); from = k + 2; k++; }
+      else if (bare[k] === "\n" || bare[k] === ";" || bare[k] === "|") { segs.push(shell.slice(from, k)); seps.push(bare[k]); from = k + 1; }
     }
-    segs.push(shell.slice(from));
+    segs.push(shell.slice(from)); seps.push("");
+    var last = -1; for (var q = 0; q < segs.length; q++) if (segs[q].trim()) last = q;
     var cwdScratch = false;
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i].trim(); if (!s) continue;
       var r = checkSegment(s, cwdScratch, cwd, who); if (r !== "allow") return r;
-      var cdm = s.match(/^cd\s+(\S+)$/);
-      if (cdm && isScratch(cdm[1])) cwdScratch = true;
-      else if (cdm && isRoot(cdm[1], cwd)) { cwd = projectRoot(); cwdScratch = false; }
+      if (!/^cd(\s|$)/.test(s)) continue;
+      // A cd moves later commands only where bash surely ran it, in this shell, before them: not after
+      // | or || (a subshell, or skipped), not before | (a subshell), and with only && or | after it
+      // (after ; || or a newline the rest also runs when the cd failed, in the old directory).
+      // Security review of 3c4a885, 2026-11-06: `cd <root> | bash <relative verify-quote>` ran the
+      // scratchpad copy while the gate resolved the root one.
+      var before = i ? seps[i - 1] : "";
+      if (before === "|" || before === "||") return "cd after | or || (it runs in a subshell or not at all); start with cd <path> &&";
+      for (var q2 = i; q2 < last; q2++)
+        if (!(seps[q2] === "&&" || (q2 > i && seps[q2] === "|"))) return "after a cd, join commands with && (and | after the first one): with ; || or a newline they also run in the old directory when the cd fails";
+      var cdm = s.match(/^cd\s+(\S+)$/); if (!cdm) return "cd takes exactly one path";
+      var tgt = cdm[1].replace(/^["\x27]|["\x27]$/g, "");
+      if (!/^\//.test(tgt)) return "cd to a relative path (CDPATH can send it elsewhere); give the absolute path";
+      if (isScratch(cdm[1])) { cwdScratch = true; cwd = path.posix.normalize(tgt); }
+      else if (isRoot(cdm[1], cwd)) { cwd = projectRoot(); cwdScratch = false; }
     }
     return "allow";
   }
