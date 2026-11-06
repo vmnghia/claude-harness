@@ -251,6 +251,9 @@ MSR="$H/rules/multi-session.md"
 for tok in owner_session expected_end busy lock-gate.sh; do grep -qF "$tok" "$MSR" && ok "multi-session.md names '$tok'" || fail "multi-session.md lacks '$tok'"; done
 grep -nE 'messages? .*machine free' "$MSR" | grep -viE 'no longer|never|don.t|do not' | grep -q . && fail "multi-session.md still tells the holder to message 'machine free'" || ok "multi-session.md no longer asks for 'machine free' messages"
 grep -qF 'no hook enforces it' "$MSR" && fail "multi-session.md still says no hook enforces it" || ok "multi-session.md no longer claims no hook enforces it"
+# 2026-11-06: a holder asked to release the chrome-devtools profile had no recipe (close_page cannot
+# close the last page; Chrome must be quit by its exact PID from the holder's own tree)
+for tok in close_page SingletonLock 'Chrome PID'; do sed -n '/^## 2b/,/^## 3/p' "$MSR" | grep -qF -- "$tok" && ok "multi-session.md §2b release recipe names '$tok'" || fail "multi-session.md §2b has no release recipe naming '$tok'"; done
 grep -qF 'Never edit a peer' "$MSR" && ok "multi-session.md forbids editing a peer's lock (incl. owner_session)" || fail "multi-session.md lacks 'Never edit a peer's lock'"
 grep -qF 'on create, message only' "$MSR" && ok "multi-session.md §6 agrees with §3 (busy-only on create)" || fail "multi-session.md §6 contradicts §3 on create messages"
 grep -qE 'Message peers \*\*before\*\* registering' "$MSR" && fail "multi-session.md §2 still asks to message all peers before a hook change" || ok "multi-session.md §2 hook/install announcements follow busy-only"

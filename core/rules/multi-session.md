@@ -39,7 +39,7 @@ others.
 | Shared measurement output folders | label collisions | Prefix labels with your ticket (`abc123-*`). Never delete a peer's labels. |
 | `.claude/settings.json`, `.claude/hooks/` | a hook change applies to every session | Message **`busy`** peers (§1) **before** registering or changing a hook, stating exactly what it can block. |
 | Git: the branch, the index, commits | a `git add` sweeps in a peer's files; the history interleaves | Stage explicit paths only, never `git add -A`. Tell a peer before committing on a branch it also commits to. |
-| The chrome-devtools MCP Chrome profile | only one session can hold it | If it's locked, don't kill it; use your own headless Chrome with its own profile (`--user-data-dir` in a temp dir). |
+| The chrome-devtools MCP Chrome profile | only one session can hold it | If it's locked, don't kill it. Ask its holder to release it (§2b), naming the holder's Chrome PID and its claude PID if you found them, or use your own headless Chrome with its own profile (`--user-data-dir` in a temp dir). |
 
 ## 2b. Own your processes
 
@@ -49,6 +49,13 @@ others.
   It held the dev ports unnoticed.
 - **A script that crashes leaves its Chrome behind.** Check for your own `--remote-debugging-port` after any
   failed run.
+- **Releasing the chrome-devtools profile when a peer asks.** `close_page` can't close the last page, so
+  closing pages never frees the profile: quit that Chrome. Walk your own tree (up from `$$` to your `claude`,
+  then down: `chrome-devtools-mcp`, then its `chrome`), check that Chrome's `--user-data-dir` is the shared
+  profile, and kill that exact Chrome PID (it exited within seconds, 2026-11-06). Expected afterwards: the
+  `chrome-devtools-mcp` server keeps running without a browser, and a `SingletonLock` naming the dead PID
+  stays behind (Chrome should take over a stale lock on the same host: inferred, untested). Whether your
+  MCP relaunches Chrome on its next call is unverified: if a browser tool then fails, tell the owner.
 - **An unknown listener is not yours until proven.** Check `readlink /proc/<pid>/cwd`, the parent chain
   and the elapsed time against your own history. If it isn't yours, ask the session that owns it, or the owner; never kill it.
 - **Select what you kill from your own process tree, never by pattern.** Take descendants of your driver's PID
