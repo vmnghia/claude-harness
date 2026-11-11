@@ -1854,6 +1854,16 @@ done
 sed -n '/^## Resume/,/^## /p' "$FF" | tr '\n' ' ' | grep -qF 'mode' && ok "feature-flow § Resume follows the run document's mode" || fail "feature-flow § Resume ignores mode"
 grep -qF 'Never skip the branch gate' "$FB" 2>/dev/null && ok "fix-bug keeps the branch gate (after Red)" || fail "fix-bug drops the branch gate"
 
+TH="$H/guides/thoroughness.md"
+grep -qF '/fix-bug' "$TH" && ok "thoroughness.md lists /fix-bug as a consumer" || fail "thoroughness.md never names /fix-bug"
+sed -n '/Agent ceiling/,/^## /p' "$TH" | tr '\n' ' ' | grep -qF 'one ceiling per phase' && ok "thoroughness.md § Agent ceiling: /fix-bug counts per phase" || fail "thoroughness.md § Agent ceiling: /fix-bug ceiling unspecified"
+[ "$(grep -c '/fix-bug' "$H/CLAUDE.md")" -ge 2 ] && ok "CLAUDE.md lists /fix-bug (guides table and teams table)" || fail "CLAUDE.md does not list /fix-bug twice"
+grep -qF '/fix-bug' "$H/rules/bug-fixes.md" && ok "bug-fixes.md names /fix-bug" || fail "bug-fixes.md never names /fix-bug"
+if [ "$H" = "$ROOT/core" ]; then
+  grep -qF '/fix-bug' "$ROOT/README.md" && ok "README names /fix-bug" || fail "README never names /fix-bug"
+  grep -qE '^Status: .*implemented on ' "$ROOT/docs/2026-11-11-fix-bug-design.md" && ok "fix-bug design Status says implemented" || fail "fix-bug design Status not updated"
+fi
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do

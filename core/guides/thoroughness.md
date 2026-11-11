@@ -11,7 +11,7 @@ How wide and how deep a run goes, chosen per run. Four knobs:
 - **Effort presets** set every knob at once, under an **agent ceiling** (`--max-agents`) on the
   dispatches of one run (§ Presets, § Agent ceiling).
 
-Consumers: `/adversarial-review`, `/feature-flow`, `/research`, `research-lead`,
+Consumers: `/adversarial-review`, `/feature-flow`, `/fix-bug`, `/research`, `research-lead`,
 `adversarial-reviewer` and `research-critic` (§ Angles only). Design:
 `docs/2026-10-27-thoroughness-knobs-design.md` in the harness repo.
 
@@ -155,11 +155,16 @@ ceiling, so an under-spent lead leaves more room, never less. At `exhaustive`, 6
 (`--no-critique`, `quick`, or an older capsule) the reserve is 0 and the lead's `max_agents` is
 the whole ceiling.
 
+**In `/fix-bug`** (`guides/ai-workflow.md` § Bug mode) the ceiling is one ceiling per phase: a
+research run it starts counts from zero against `max_agents`, and so does the gate, as each does
+when run by its own command. A run can therefore dispatch up to twice the number typed. The
+research run's `max_iter` is research's own (3), not the team flow's gate cap.
+
 ## Input
 
 Each command's § Input points here instead of repeating this.
 
-**Flags**, shared by `/adversarial-review`, `/feature-flow` and `/research`:
+**Flags**, shared by `/adversarial-review`, `/feature-flow`, `/fix-bug` and `/research`:
 
 - `--effort=quick|standard|thorough|exhaustive`: the preset.
 - `--width=<agent>:<n>[,<agent>:<n>…]`: the width of one or more agent types, named as in

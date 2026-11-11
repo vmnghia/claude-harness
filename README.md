@@ -6,7 +6,8 @@ production web app, then made project-agnostic.
 
 - **Feature workflow:** Planner → Coder → Tester → Reviewer, run step by step (`/planner`,
   `/coder`, `/tester`, `/reviewer`) or end to end (`/feature-flow`), with fix loops and iteration
-  caps. Agents never commit, push or create branches.
+  caps. For a bug, `/fix-bug` runs the same team from the diagnosis to a fix proven against its
+  repro: red before the fix, green after. Agents never commit, push or create branches.
 - **Research team:** `/research` frames a question with you, then a lead dispatches a searcher,
   a web reader, an incident investigator (with a browser repro driver), a designer and a writer,
   and writes a findings file where every claim carries its provenance.

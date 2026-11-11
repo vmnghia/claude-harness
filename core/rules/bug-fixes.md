@@ -22,6 +22,8 @@ When the bug ticket has an attached video/screenshot you can't view, ask the rep
 5. **Implement the fix.** Smallest change that addresses the root cause.
 6. **Verify against the repro.** The same steps that produced the bug must now produce the expected behavior.
 
+`/fix-bug <ticket>` runs this workflow as a team: `/research` for steps 1 to 4, then a red run before the fix and a green run after it (`guides/ai-workflow.md` § Bug mode).
+
 ## What this means in practice
 
 - Do not pre-create branches, scaffolding, or "preparation" edits before repro is confirmed — that signals you're about to fix something unverified.

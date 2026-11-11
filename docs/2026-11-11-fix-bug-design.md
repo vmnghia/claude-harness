@@ -1,6 +1,7 @@
 # `/fix-bug`: the team flow for a bug, from diagnosis to a fix proven against its repro
 
-Status: approved by the owner 2026-11-11 (builder check done). Not implemented.
+Status: approved by the owner 2026-11-11 (builder check done); implemented on `feat/fix-bug`
+2026-11-11. Acceptance rows 2 to 5 are open: the smokes have not been run.
 
 Read first: [2026-10-22-team-flow-design.md](./2026-10-22-team-flow-design.md) (the lead, the
 persistent peers, the run document), [2026-10-14-research-workflow-design.md](./2026-10-14-research-workflow-design.md)
