@@ -415,6 +415,11 @@ research run started here gets research's own default cap (3). `--max-agents` is
 **one ceiling per phase**: the research run counts from zero against it and so does the gate,
 so a run can dispatch up to twice the number typed.
 
+**`--no-test`** is the owner's waiver of the repro: there is no Tester, so no red and no green
+run. When the run document is created, on every entry (`--spec` included), record a `DECISION`
+`by: owner` ("`--no-test` typed: repro waived") and `repro: waived (D<n>)`, warn once, and say
+so in the recap's first line. Reviewer and the gate's hunters read that decision.
+
 **B1. Diagnosis.** `step: diagnosis`.
 - **Pick up.** Read the frontmatter of every `.claude/investigations/*/findings.md`. Keep the
   ones with `ticket:` equal to the bug ticket, `kind: incident` and `status: settled`, following
@@ -444,9 +449,7 @@ steps the investigation attempted, or stop). Ask once, with `AskUserQuestion`, t
 recommendation first in each. Each answer is a `DECISION` block `by: owner` in the state block;
 `findings.md` is not touched. Nothing to decide: no pause. Under `--auto` with something to
 decide: final `NEEDS_OWNER` listing the questions; a council never assumes an owner's decision
-about a bug fix. `--no-test` is the owner's waiver: record a `DECISION` `by: owner`
-("`--no-test` typed: repro waived") and `repro: waived (D<n>)` here, warn once, and say so in
-the recap's first line.
+about a bug fix.
 
 **B3. Planning.** `step: planning`. As § Procedure step 1, with one more capsule item:
 

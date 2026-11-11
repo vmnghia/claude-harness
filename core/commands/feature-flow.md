@@ -77,7 +77,9 @@ requirement without `--resume` → stop with the final block, `status: NEEDS_CLA
 ## Resume
 
 `--resume [<run-document>]`: read the state block of the given file, else the newest
-`.claude/runs/*.md` that has one. In its roster every id is dead with the old session: re-dispatch Planner
+`.claude/runs/*.md` that has one. The state block's `mode` decides the path: `bug` is a
+`/fix-bug` run and follows `guides/ai-workflow.md` § Resume and § Bug mode instead of what
+follows here; absent or `feature` is this path. In its roster every id is dead with the old session: re-dispatch Planner
 (subagent), Coder, Tester and Reviewer fresh, each with the spec, the plan, the full `decisions`
 list and the standby brief; write the new roster into the state block; restart the current `step` from
 its beginning with the counters kept; the gate resumes per its own guide § Resume. Run the branch

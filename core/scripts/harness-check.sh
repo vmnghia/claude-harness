@@ -1468,13 +1468,13 @@ sed -n '/^## Debate rules/,/^### End states/p' "$AR" 2>/dev/null | tr '\n' ' ' |
 
 # commands carry the shared flags (task 3); research.md joins the loop in task 4
 FF="$H/commands/feature-flow.md"
-for c in adversarial-review feature-flow research; do
+for c in adversarial-review feature-flow fix-bug research; do
   hint=$(grep -m1 '^argument-hint:' "$H/commands/$c.md" 2>/dev/null)
   if printf '%s\n' "$hint" | grep -qE -- '--max-iter|--max-gate-iter'; then
     printf '%s\n' "$hint" | grep -qF -- '--effort' && ok "commands/$c.md argument-hint carries --effort" || fail "commands/$c.md argument-hint lacks --effort"
   fi
 done
-for c in adversarial-review feature-flow; do
+for c in adversarial-review feature-flow fix-bug; do
   for tok in 'guides/thoroughness.md' '--width' 'knobs:' 'dry-check'; do
     grep -qF -- "$tok" "$H/commands/$c.md" 2>/dev/null && ok "commands/$c.md mentions $tok" || fail "commands/$c.md never mentions $tok"
   done
@@ -1836,6 +1836,23 @@ grep -qE 'On failure, capture evidence' "$TS" && fail "tester.md captures eviden
 CODER="$H/agents/coder.md"
 grep -qF 'repro:' "$CODER" && grep -qiF 'does not reproduce again' "$CODER" && ok "coder.md: the lead's repro state is the confirmation in bug mode" || fail "coder.md: bug-mode repro confirmation unspecified"
 grep -qiF 'standby' "$CODER" && grep -qF 'the spec is final' "$CODER" && ok "coder.md: standby until the spec is final (bug mode)" || fail "coder.md: no bug-mode standby"
+
+FB="$H/commands/fix-bug.md"; FF="$H/commands/feature-flow.md"
+check "commands/fix-bug.md exists" test -f "$FB"
+grep -qE 'Read.*ai-workflow\.md' "$FB" 2>/dev/null && ok "fix-bug Reads ai-workflow.md" || fail "fix-bug never Reads ai-workflow.md"
+for tok in 'Bug mode' '--run-research' '--fix-ticket=' '--spec=' '--resume' '--no-test' '--max-gate-iter' \
+           'commands/research.md' 'kind: incident' 'mode: bug' 'switchboard' 'by agent id' 'every id is dead' \
+           'AskUserQuestion' 'agent: lead' 'NO_BUILD_NEEDED' 'NOT_REPRODUCED' 'NEEDS_OWNER' 'cost line' \
+           'one ceiling per phase' 'waiver'; do
+  grep -qF -- "$tok" "$FB" 2>/dev/null && ok "fix-bug mentions $tok" || fail "fix-bug never mentions $tok"
+done
+grep -qE '^### Step' "$FB" 2>/dev/null && fail "fix-bug holds procedure steps; they belong in ai-workflow.md § Bug mode" || ok "fix-bug holds no procedure step"
+hint=$(grep -m1 '^argument-hint:' "$FB" 2>/dev/null)
+for f in $(grep -m1 '^argument-hint:' "$FF" | grep -oE -- '--[a-z-]+'); do
+  printf '%s' "$hint" | grep -qF -- "$f" && ok "fix-bug argument-hint carries $f" || fail "fix-bug argument-hint lacks $f"
+done
+sed -n '/^## Resume/,/^## /p' "$FF" | tr '\n' ' ' | grep -qF 'mode' && ok "feature-flow § Resume follows the run document's mode" || fail "feature-flow § Resume ignores mode"
+grep -qF 'Never skip the branch gate' "$FB" 2>/dev/null && ok "fix-bug keeps the branch gate (after Red)" || fail "fix-bug drops the branch gate"
 
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
