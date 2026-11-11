@@ -1780,6 +1780,35 @@ PMD="$H/project.md"; [ "$H" = "$ROOT/core" ] && PMD="$ROOT/project-template/proj
 SP_STALE=$(stale_paths "$PMD" "$H")
 [ -z "$SP_STALE" ] && ok "project.md names only harness files that exist" || fail "project.md names harness files that no longer exist (update its commands): $SP_STALE"
 
+echo "== 5k. Bug mode: /fix-bug (2026-11-11) =="
+WF="$H/guides/ai-workflow.md"
+BM=$(sed -n '/^## Bug mode/,/^## Mechanical enforcement/p' "$WF" 2>/dev/null | tr '\n' ' ' | sed 's/  */ /g')
+[ -n "$BM" ] && ok "ai-workflow.md has ## Bug mode" || fail "ai-workflow.md lacks ## Bug mode"
+btok() { # btok <token> <agent-basename>: word match in the guide and the agent file
+  if grep -qw -- "$1" "$WF" && grep -qw -- "$1" "$H/agents/$2"; then ok "'$1' in ai-workflow.md + $2"
+  else fail "'$1' missing from ai-workflow.md or $2"; fi
+}
+grep -qF 'step: diagnosis | decisions | planning | spec-review | red | coding | testing | reviewing | gate | done' "$WF" \
+  && ok "state block: step enum carries the bug steps in order" || fail "state block: step enum lacks the bug steps"
+for tok in 'mode: feature | bug' 'bug_ticket' 'fix_ticket' 'investigations:' 'repro: pending | REPRODUCED | waived (D<n>)'; do
+  grep -qF -- "$tok" "$WF" && ok "state block carries $tok" || fail "state block lacks $tok"
+done
+for tok in 'kind: incident' 'status: settled' 'superseded_by' 'research.md § New run' 'research.md § Resume' \
+           'NO_BUILD_NEEDED' 'AskUserQuestion' 'findings.md` is not touched' 'diagnosis:' \
+           'SPEC REVIEW' 'FIX FROM SPEC REVIEW' 'One pass' 'RED CHECK' 'not_executable' \
+           '.claude/runs/<run-slug>-evidence/' 'One widening per run' 'Never proceed silently' \
+           'is the owner'"'"'s waiver' 'one ceiling per phase' 'expected (fixed)' 'no fresh lead'; do
+  printf '%s' "$BM" | grep -qF -- "$tok" && ok "## Bug mode: $tok" || fail "## Bug mode lacks: $tok"
+done
+printf '%s' "$BM" | grep -qE 'branch gate.*after Red|after Red.*branch gate' && ok "## Bug mode: the branch gate runs after Red" || fail "## Bug mode: branch gate position unspecified"
+sed -n '/^### Resume/,/^## Procedure/p' "$WF" | tr '\n' ' ' | grep -qF 'absent means `feature`' \
+  && ok "§ Resume: a run document without mode is a feature run" || fail "§ Resume: no rule for a run document without mode"
+sed -n '/^## Procedure/,/^## Bug mode/p' "$WF" | grep -qE 'RED CHECK|SPEC REVIEW' \
+  && fail "§ Procedure carries a bug step (a feature run must read none)" || ok "§ Procedure carries no bug step"
+grep -qE 'status: READY_FOR_HUMAN_APPLY.*NO_BUILD_NEEDED.*NOT_REPRODUCED' "$WF" \
+  && ok "lead block lists NO_BUILD_NEEDED and NOT_REPRODUCED" || fail "lead block lacks the bug-mode final statuses"
+grep -qF '/fix-bug' "$WF" && ok "ai-workflow.md names /fix-bug as an entry point" || fail "ai-workflow.md never names /fix-bug"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do

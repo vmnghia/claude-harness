@@ -26,6 +26,9 @@ The seven-agent **research team** (`/research`) has its own contract:
 - `/feature-flow <requirement | FRONT-XXXX> [--auto] [--no-test] [--max-iter=N]`
   — the full sequence. Interactive runs plan inline; `--auto` dispatches the
   planner subagent with a context capsule.
+- `/fix-bug <FRONT-XXXX> [--run-research] [--fix-ticket=FRONT-YYYY] [--spec=<path>]` — the same
+  team for a bug: diagnosis, the owner's decisions, a bug spec, a spec review and a red run
+  before the fix (§ Bug mode).
 
 Never duplicate an agent's procedure in a command file — commands select the
 execution locus; agent files hold the procedure.
@@ -78,8 +81,8 @@ payload:
 | -------- | ------------------------------------ | --------------------- |
 | Planner  | `SPEC_READY` / `NEEDS_CLARIFICATION` | `spec_path`, `plan_path`, `summary`, `is_bug_spec`, `open_questions[]` |
 | Coder    | `IMPLEMENTED` / `BLOCKED`            | `changed_files[]` (each: `path`, `note`), `notes`, `build_result`, `test_result: pass\|fail\|n/a`, `blockers[]` |
-| Tester   | `PASS` / `BUGS_FOUND`                | `scenarios_run[]`, `failures[]` (each: scenario, expected, actual, evidence path, console) |
-| Reviewer | `APPROVED` / `CHANGES_REQUESTED`     | `findings[]` (each: severity, file, line, issue, suggestion), `summary` |
+| Tester   | `PASS` / `BUGS_FOUND`; `REPRODUCED` / `NOT_REPRODUCED` (bug mode's red check) | `scenarios_run[]`, `failures[]` (each: scenario, expected, actual, evidence path, console); red check: `repro_results[]` (each: scenario, `reproduced \| not_reproduced \| not_executable`, evidence path), `positive_control` |
+| Reviewer | `APPROVED` / `CHANGES_REQUESTED`; `SPEC_APPROVED` / `SPEC_CHANGES_REQUESTED` (bug mode's spec review) | `findings[]` (each: severity, file, line, issue, suggestion), `summary` |
 
 Every peer block may also carry `decisions_applied: [D…]` and `questions_asked: [Q…]`
 (§ Team protocol). A reply that ends in a blocking `QUESTION` block carries no status block.
@@ -158,10 +161,15 @@ boundary and after every decision:
 
 ```yaml
 state:
-  step: planning | coding | testing | reviewing | gate | done
+  mode: feature | bug    # absent means `feature`; `bug` is § Bug mode
+  step: diagnosis | decisions | planning | spec-review | red | coding | testing | reviewing | gate | done   # the first two and spec-review, red: bug mode only
   test_iter: 0
   review_iter: 0
   gate_iter: 0
+  bug_ticket: FRONT-XXXX          # bug mode only, as the three lines below
+  fix_ticket: FRONT-YYYY
+  investigations: [<folder>, …]   # newest first
+  repro: pending | REPRODUCED | waived (D<n>)
   knobs: {…}   # resolved once per guides/thoroughness.md § Input; never re-resolved
   roster: {lead: main, planner: <agent id or inline>, coder: <id>, tester: <id>, reviewer: <id>}
   decisions:
@@ -330,7 +338,12 @@ position wakes a context.
 
 ### Resume
 
-`/feature-flow --resume [<run-document>]`: every roster id is dead with the old session.
+`/feature-flow --resume [<run-document>]` and `/fix-bug --resume [<run-document>]` are the same:
+the state block's `mode` decides the path (absent means `feature`), whichever command was
+typed. In bug mode, `step: diagnosis` follows § Bug mode B1 (re-scan when the recorded folder
+is settled, else its `AWAITING_HUMAN` rule); `decisions` and `planning` restart from their
+beginning with no team; `spec-review` and `red` restart from B4 with a fresh team; and the
+branch gate is re-run only from `coding` on. Every roster id is dead with the old session.
 Re-dispatch Planner (subagent), Coder, Tester and Reviewer fresh, each with the spec, the plan,
 the full `decisions` list and the standby brief; write the new roster; restart the current
 `step` from its beginning (a half-done coding step runs again on the tree as it is, with Coder
@@ -386,6 +399,115 @@ rather than discovering it mid-gate.
    assumptions, remaining minors and nits, and the owner's next step (commit). Then the final
    block.
 
+## Bug mode
+
+`/fix-bug` runs a bug from its ticket to a fix proven against its repro (design:
+`docs/2026-11-11-fix-bug-design.md` in the harness repo). It is [bug-fixes.md](../rules/bug-fixes.md)
+run by the team. Bug mode **replaces § Procedure steps 0 to 2** with steps B1 to B6 below and
+then hands over to § Procedure step 3. `--spec=<path>` enters at B4. Everything in § Team
+protocol applies; the run document carries `mode: bug` from its first write, and it is created
+at the start of B1 (`step: diagnosis`), named from the fix ticket when one was given, else the
+bug ticket.
+
+**Knobs.** The thoroughness flags resolve once and serve both the research run and the gate,
+with two exceptions. `--max-iter` and the preset's `max_iter` belong to the fix phase only: a
+research run started here gets research's own default cap (3). `--max-agents` is
+**one ceiling per phase**: the research run counts from zero against it and so does the gate,
+so a run can dispatch up to twice the number typed.
+
+**B1. Diagnosis.** `step: diagnosis`.
+- **Pick up.** Read the frontmatter of every `.claude/investigations/*/findings.md`. Keep the
+  ones with `ticket:` equal to the bug ticket, `kind: incident` and `status: settled`, following
+  `superseded_by`, newest folder first. Together they are the diagnosis; where two disagree the
+  newest governs. Record them in `investigations:`. A settled run of another kind on the same
+  ticket is not the diagnosis: list it for the owner in B2.
+- **None settled, or `--run-research`:** execute `commands/research.md § New run` for the bug
+  ticket in this session, with the knobs above. Its Framing asks the owner, always, even with
+  `--auto`. When a settled investigation exists, frame a delta run and say so. Write the new
+  folder into `investigations:` as soon as it exists.
+- **An investigation is `status: open`.** Open covers every unfinished run (just framed, paused,
+  mid-critique, ended `PARTIAL`, or live in another session); do not guess which. Ask the owner:
+  resume it, plan from it as it stands, run a delta, or stop. Under `--auto`: final `NEEDS_OWNER`.
+- **Research returns `AWAITING_HUMAN`:** final `NEEDS_OWNER` with the action. On `--resume` in
+  the same session, execute `commands/research.md § Resume` and carry on. From a new session
+  that section's step 4 applies unchanged: the lead cannot be resumed and no fresh lead is
+  started for an existing run. Offer what it offers (abandon, or a new `-2` run seeded from the
+  old one) plus "plan from it as it stands".
+- **`STOPPED`, or `stopped` / `on-hold` on disk:** final `BLOCKED`, quoting `status_reason`.
+- **Next says "No build needed":** final `NO_BUILD_NEEDED`, quoting the Answer.
+
+**B2. Decisions.** `step: decisions`. Read the investigations' `## Open`, `## Options`,
+`## Decisions` and `## Repro`. List what only the owner can settle and has not: Open rows whose
+resolver is the owner, an Options table with no Decisions row choosing, and a Repro that is not
+`REPRODUCED` (the choices: waive the repro and proceed on the evidence, try Red anyway with the
+steps the investigation attempted, or stop). Ask once, with `AskUserQuestion`, the research's
+recommendation first in each. Each answer is a `DECISION` block `by: owner` in the state block;
+`findings.md` is not touched. Nothing to decide: no pause. Under `--auto` with something to
+decide: final `NEEDS_OWNER` listing the questions; a council never assumes an owner's decision
+about a bug fix. `--no-test` is the owner's waiver: record a `DECISION` `by: owner`
+("`--no-test` typed: repro waived") and `repro: waived (D<n>)` here, warn once, and say so in
+the recap's first line.
+
+**B3. Planning.** `step: planning`. As § Procedure step 1, with one more capsule item:
+
+```yaml
+diagnosis:
+  investigations: [<folder>, …]     # newest first
+  next: <the Next paragraph(s), verbatim>
+  decisions: [D1, D2, …]            # by: owner, from B2
+  bug_ticket: FRONT-XXXX
+  fix_ticket: FRONT-YYYY            # defaults to the bug ticket
+```
+
+Planner writes a bug spec from it (`agents/planner.md`): the root cause in the investigation's
+words, Repro Steps from its `## Repro`, and at least one Test Scenario marked `repro: yes` with
+`expected (unfixed)` and `expected (fixed)`, unless the repro was waived.
+
+**B4. Team up.** As § Procedure step 2, except that **Coder also gets the standby brief** and
+starts nothing. With `--spec`, check first that the sibling plan exists and that the spec has a
+`repro: yes` scenario (or the repro is waived); otherwise final `NEEDS_CLARIFICATION` naming
+what is missing.
+
+**B5. Spec review** and **B6. Red** go out in one message.
+
+**B5. Spec review.** `step: spec-review`. Resume Reviewer: "SPEC REVIEW: read the spec and the
+plan against the code as it stands". `SPEC_APPROVED` → nothing to do.
+`SPEC_CHANGES_REQUESTED` → every `blocker` and `major` is fixed in the spec and plan before
+coding. Under `--auto` resume the standby Planner with "FIX FROM SPEC REVIEW" and the
+`findings[]`; in every other case (inline planning, `--spec`, a resumed run) the lead applies
+them. A finding whose fix changes an owner decision goes to the owner, not to a council.
+One pass: no re-review, no counter. Reviewer keeps what it read for step 5.
+
+**B6. Red.** `step: red`. Skipped when `repro: waived`. Resume Tester: "RED CHECK: drive only
+the `repro: yes` scenarios on the tree as it is, against `expected (unfixed)`; run slug
+<slug>". Its block lists a result per scenario (`reproduced`, `not_reproduced`,
+`not_executable`) and evidence under `.claude/runs/<run-slug>-evidence/`.
+- `REPRODUCED` → `repro: REPRODUCED` and the evidence paths into the state block.
+- A `not_executable` scenario is a spec defect: add it to B5's findings, fix the spec, and run
+  Red once more. A second `not_executable` is `NOT_REPRODUCED`. A spec fix from B5 that changes
+  a `repro: yes` scenario's steps also makes Red run again.
+- `NOT_REPRODUCED` → the owner chooses: widen the net, proceed on the evidence, or stop.
+  Proceeding is a `DECISION` `by: owner` and `repro: waived (D<n>)`. Stopping is final
+  `NOT_REPRODUCED`. Under `--auto`: final `NOT_REPRODUCED`. Never proceed silently.
+- **Widening the net** is a delta research run whose question is the repro (B1's second
+  bullet). When it settles, go back to B2 for what is new, then B3 with Planner revising the
+  existing pair (the lead does it: widening never happens under `--auto`), then B5 on the
+  changed parts and B6 again, with the same team. One widening per run: after a second
+  `NOT_REPRODUCED` the owner's choices are proceed or stop.
+
+**Branch gate.** As § Branch policy, always. In bug mode the branch gate runs after Red, not at
+the start: [bug-fixes.md](../rules/bug-fixes.md) says not to prepare a branch before the repro
+is confirmed, and nothing before this point edits source.
+
+**B7. Fix.** § Procedure steps 3 to 7, with these additions to messages and none to routing:
+- Coder's first resume: "the spec is final; repro: <state>; decisions so far: D…". That state
+  is the repro confirmation `agents/coder.md` asks for; Coder does not reproduce again.
+- Tester's "the tree is ready" names the `repro: yes` scenarios and the red evidence paths. A
+  `PASS` needs each of them to meet `expected (fixed)` on the same steps, red and green
+  evidence listed side by side. With `repro: waived` Tester says the red half is missing.
+- The recap adds the investigation folders, the bug and fix tickets, the root cause in one
+  line, the repro state, and the red and green evidence paths.
+
 ## Mechanical enforcement (hooks)
 
 The prose rules are backed by two hooks registered in `.claude/settings.json`:
@@ -424,9 +546,10 @@ dev-server restart wait (`project.md` § Dev server). Type-check passing
 
 ## Bug-fix rule (inherited)
 
-For bug specs, Coder follows [bug-fixes.md](../rules/bug-fixes.md): reproduce
-locally first, implement, re-verify against the same repro. Tester mimics
-the real user flow — no `router.push` shortcuts.
+`/fix-bug` runs [bug-fixes.md](../rules/bug-fixes.md) as § Bug mode: Tester proves the bug red
+before the fix and green after, on the same steps. In a `/feature-flow` run on a bug spec, Coder
+still follows it: reproduce locally first, implement, re-verify against the same repro. Tester
+mimics the real user flow in both: no `router.push` shortcuts.
 
 ## Run log
 
@@ -443,15 +566,20 @@ The orchestrator's final reply always carries a single status block:
 ```yaml
 ---
 agent: lead
-status: READY_FOR_HUMAN_APPLY | BUG_LIMIT_REACHED | REVIEW_LIMIT_REACHED | BLOCKED | NEEDS_CLARIFICATION | NEEDS_OWNER | STALLED
+status: READY_FOR_HUMAN_APPLY | BUG_LIMIT_REACHED | REVIEW_LIMIT_REACHED | BLOCKED | NEEDS_CLARIFICATION | NEEDS_OWNER | STALLED | NO_BUILD_NEEDED | NOT_REPRODUCED
 spec: <path>
 test_iter: <n>
 review_iter: <n>
 gate_iter: <n>
 run_document: <path>
+investigations: [<folder>, …]   # bug mode only
+repro: <state>                  # bug mode only
 summary: <one-line summary>
 ---
 ```
+
+`NO_BUILD_NEEDED` and `NOT_REPRODUCED` are bug mode's: the diagnosis says there is nothing to
+build, or the red check failed and the owner (or `--auto`) stopped (§ Bug mode B1, B6).
 
 `NEEDS_OWNER`: an `--auto` run reached a decision only the owner can make and the council did
 not converge, or an objection to an owner decision. `STALLED`: the gate's circuit breaker.
