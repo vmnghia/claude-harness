@@ -1809,6 +1809,18 @@ grep -qE 'status: READY_FOR_HUMAN_APPLY.*NO_BUILD_NEEDED.*NOT_REPRODUCED' "$WF" 
   && ok "lead block lists NO_BUILD_NEEDED and NOT_REPRODUCED" || fail "lead block lacks the bug-mode final statuses"
 grep -qF '/fix-bug' "$WF" && ok "ai-workflow.md names /fix-bug as an entry point" || fail "ai-workflow.md never names /fix-bug"
 
+PL="$H/agents/planner.md"; ST="$H/templates/spec-template.md"
+btok 'diagnosis' planner.md
+for tok in 'FIX FROM SPEC REVIEW' 'repro: yes' 'expected (unfixed)' 'expected (fixed)' 'waived (D<n>)' 'revis'; do
+  grep -qF -- "$tok" "$PL" && ok "planner.md: $tok" || fail "planner.md lacks: $tok"
+done
+has_tool "$PL" Edit && ok "planner has Edit (spec fixes after the spec review)" || fail "planner lacks Edit"
+for t in Bash Agent; do has_tool "$PL" "$t" && fail "planner must not have $t" || ok "planner has no $t"; done
+grep -qF 'Do not run Bash' "$PL" && ok "planner.md still forbids Bash" || fail "planner.md lost the Bash boundary"
+for tok in 'repro: yes' 'expected (unfixed)' 'expected (fixed)'; do
+  grep -qF -- "$tok" "$ST" && ok "spec-template.md: $tok" || fail "spec-template.md lacks: $tok"
+done
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do

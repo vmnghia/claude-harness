@@ -24,7 +24,9 @@ from `.claude/rules/*`, and risk boundaries (payment, analytics, SEO paths).
 
 ## Repro Steps
 <!-- Bug specs only — delete for features. Per .claude/rules/bug-fixes.md:
-     reproduce BEFORE fixing. -->
+     reproduce BEFORE fixing. From a diagnosis (/fix-bug): the investigation's own steps. Steps
+     it attempted but did not reproduce are labelled `assumed`; when the owner waived the repro,
+     write `waived (D<n>)` and nothing else. -->
 Numbered steps that reliably reproduce the defect locally: env
 (prod/staging/local), browser, device emulation, cookie state, build mode.
 
@@ -50,6 +52,9 @@ For each scenario:
 - steps (chrome-devtools MCP actions: navigate_page, evaluate_script, click…)
 - expected DOM / console / network outcome
 - evidence to capture (screenshot path, console lines)
+- bug specs only: `repro: yes` on each scenario that reproduces the bug, and in place of the
+  single expected outcome, `expected (unfixed)` (the symptom) and `expected (fixed)`. Tester
+  drives these before the fix and again after it, on the same steps.
 
 ## Open Questions
 Anything unresolved that blocks the flow. Autonomous planning mode records
