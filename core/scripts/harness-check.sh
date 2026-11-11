@@ -1821,6 +1821,22 @@ for tok in 'repro: yes' 'expected (unfixed)' 'expected (fixed)'; do
   grep -qF -- "$tok" "$ST" && ok "spec-template.md: $tok" || fail "spec-template.md lacks: $tok"
 done
 
+btok 'SPEC_APPROVED' reviewer.md
+btok 'SPEC_CHANGES_REQUESTED' reviewer.md
+btok 'REPRODUCED' tester.md
+btok 'NOT_REPRODUCED' tester.md
+btok 'not_executable' tester.md
+grep -qF 'SPEC REVIEW' "$H/agents/reviewer.md" && ok "reviewer.md knows the SPEC REVIEW brief" || fail "reviewer.md lacks the SPEC REVIEW brief"
+TS="$H/agents/tester.md"
+for tok in 'RED CHECK' 'repro: yes' 'expected (unfixed)' 'expected (fixed)' 'positive_control' '.claude/runs/<run-slug>-evidence/'; do
+  grep -qF -- "$tok" "$TS" && ok "tester.md: $tok" || fail "tester.md lacks: $tok"
+done
+grep -qF '/tmp/tester-' "$TS" && fail "tester.md still writes evidence to /tmp" || ok "tester.md writes no evidence to /tmp"
+grep -qE 'On failure, capture evidence' "$TS" && fail "tester.md captures evidence on failure only" || ok "tester.md captures evidence on success too"
+CODER="$H/agents/coder.md"
+grep -qF 'repro:' "$CODER" && grep -qiF 'does not reproduce again' "$CODER" && ok "coder.md: the lead's repro state is the confirmation in bug mode" || fail "coder.md: bug-mode repro confirmation unspecified"
+grep -qiF 'standby' "$CODER" && grep -qF 'the spec is final' "$CODER" && ok "coder.md: standby until the spec is final (bug mode)" || fail "coder.md: no bug-mode standby"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do

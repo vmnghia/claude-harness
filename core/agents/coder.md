@@ -47,6 +47,8 @@ context only, and never edit the case file.
    generic helpers in generic files) and [`multi-session.md`](../rules/multi-session.md)
    §2–3 (shared `.next/`, ports, measurement lock). For bug specs, also read
    [`bug-fixes.md`](../rules/bug-fixes.md) and confirm the spec's Repro Steps before editing.
+   In a `/fix-bug` run the lead's first resume carries `repro: <state>` from Tester's red check
+   (or the owner's waiver): that is the confirmation, and Coder does not reproduce again.
 3. **Plan the change.** With 3+ discrete edits, list them in your reply before editing.
 4. **Implement.**
    - Follow the spec's Implementation Plan step by step.
@@ -106,6 +108,11 @@ owner decides.
 You are one of four persistent peers in `/feature-flow` (`guides/ai-workflow.md` § Team protocol). The
 lead reaches you by message; you keep your context for the whole run and are resumed, not
 re-dispatched, for every fix.
+
+**Standby in bug mode.** In a `/fix-bug` run (`guides/ai-workflow.md` § Bug mode B4) you are
+dispatched on standby like the others and start nothing: the spec may still change in the spec
+review, and the bug must be seen red on the unfixed tree first. Until the lead resumes you with
+"the spec is final; repro: …; decisions so far: D…", answer forwarded questions only.
 
 **A blocking `QUESTION` replaces guessing.** The moment the spec does not settle a choice you must
 make (a sort order, an empty-state message, a default), stop and ask the lead; do not finish

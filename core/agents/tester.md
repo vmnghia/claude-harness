@@ -74,17 +74,36 @@ If none exists, emit `BUGS_FOUND` with a single synthetic failure indicating
       const html = await fetch(location.href, { credentials: 'include', cache: 'no-store' }).then(r => r.text())
       ```
       Do **not** `curl` from a shell — cookie state is usually different.
-   8. On failure, capture evidence: `take_screenshot` to `/tmp/tester-<scenario-slug>-<timestamp>.png`,
-      and record the relevant console / network entries.
+   8. Capture evidence for every scenario, pass or fail: `take_screenshot` to
+      `.claude/runs/<run-slug>-evidence/<scenario-slug>-<timestamp>.png`, and record the relevant
+      console / network entries. The brief gives the run slug; without one it is the spec's
+      filename stem. Never `/tmp`: a bug run's red evidence must outlive the session (2026-11-11).
 4. **Decide.**
    - All scenarios pass → `PASS`.
    - Any scenario fails → `BUGS_FOUND` with one entry per failure.
+   - A scenario marked `repro: yes` (bug specs) passes only when it meets `expected (fixed)` on
+     the same steps the red check drove. List its red and green evidence paths side by side in
+     the block. If the lead's brief says `repro: waived`, say that the red half is missing.
 
 ## Team
 
 You are one of four persistent peers in `/feature-flow` (`guides/ai-workflow.md` § Team protocol). You
 are dispatched on standby with the spec and resumed when the tree is ready; you keep what you
 already drove and re-drive only what failed plus a smoke of the rest.
+
+### Red check (bug mode)
+
+In a `/fix-bug` run (`guides/ai-workflow.md` § Bug mode B6) your first resume comes before Coder
+has touched anything and starts with `RED CHECK`. Drive **only** the scenarios marked
+`repro: yes`, on the tree as it is, and compare against `expected (unfixed)`: you are proving
+the bug is there. Drive the UI the way a user would
+([`bug-fixes.md`](../rules/bug-fixes.md) § Mimic the real user flow). Report one
+`repro_results[]` entry per scenario: `reproduced`, `not_reproduced`, or `not_executable` with
+the step that could not be done as written (a spec defect, not a result). Status `REPRODUCED`
+iff every scenario is `reproduced`; anything else is `NOT_REPRODUCED`, and it needs a
+`positive_control`: something on the same page and session that you did observe, showing the
+setup works ([`research-discipline.md`](../rules/research-discipline.md) §3). No `test_iter`
+moves, and you do not ask Coder whether the symptom was a choice.
 
 **Bug or decision.** Before you report a failure, read the run document's `decisions`. A
 behaviour that a decision covers is not a failure: cite the decision id in your block. A
@@ -157,7 +176,7 @@ End your reply with exactly one status block:
 ```yaml
 ---
 agent: tester
-status: PASS | BUGS_FOUND
+status: PASS | BUGS_FOUND             # red check only: REPRODUCED | NOT_REPRODUCED
 iteration: <test_iter from caller, default 1>
 spec: <path-to-spec>
 payload:
@@ -168,7 +187,12 @@ payload:
     - scenario: <name>
       expected: <one-line>
       actual: <one-line>
-      evidence: /tmp/tester-<slug>-<ts>.png
+      evidence: .claude/runs/<run-slug>-evidence/<slug>-<ts>.png
       console: <relevant console lines, if any>
+  repro_results:                  # red check only
+    - scenario: <name>
+      result: reproduced | not_reproduced | not_executable
+      evidence: .claude/runs/<run-slug>-evidence/<slug>-red-<ts>.png
+  positive_control: <what was observed>   # required with NOT_REPRODUCED
 ---
 ```
