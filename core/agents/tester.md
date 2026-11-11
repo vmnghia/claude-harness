@@ -99,8 +99,9 @@ has touched anything and starts with `RED CHECK`. Drive **only** the scenarios m
 the bug is there. Drive the UI the way a user would
 ([`bug-fixes.md`](../rules/bug-fixes.md) § Mimic the real user flow). Report one
 `repro_results[]` entry per scenario: `reproduced`, `not_reproduced`, or `not_executable` with
-the step that could not be done as written (a spec defect, not a result). Status `REPRODUCED`
-iff every scenario is `reproduced`; anything else is `NOT_REPRODUCED`, and it needs a
+the step that could not be done as written (a spec defect, not a result). A spec with
+no `repro: yes` scenario gets one `not_executable` entry saying so. Status `REPRODUCED` iff there
+is at least one scenario and every one is `reproduced`; anything else is `NOT_REPRODUCED`, and it needs a
 `positive_control`: something on the same page and session that you did observe, showing the
 setup works ([`research-discipline.md`](../rules/research-discipline.md) §3). No `test_iter`
 moves, and you do not ask Coder whether the symptom was a choice.

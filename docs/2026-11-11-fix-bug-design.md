@@ -10,7 +10,7 @@ settled investigation is). Paths below are relative to `core/` unless they start
 
 ## Intent
 
-A bug ticket today takes five hand-offs that the owner drives by hand. The reference run is the
+A bug ticket today takes five hand-offs that the owner drives by hand. The reference run is
 a bug-fix session in a consuming project (2026-11-04 to 2026-11-10; ticket keys below are placeholders):
 
 1. `/research FRONT-AAAA --effort=thorough`: diagnosis, repro-driver, three critique rounds.
@@ -347,6 +347,27 @@ The guide's lead block, plus `investigations`, `repro`, and two statuses:
 | `rules/bug-fixes.md` | one line naming `/fix-bug` as the automated form of the workflow |
 | `guides/thoroughness.md`, `CLAUDE.md`, `README.md` | the command added wherever `/feature-flow` is listed |
 | `scripts/harness-check.sh` | cases in the style of the `feature-flow` block: the command Reads the guide and holds no procedure heading; every new status and step token appears in both the guide and the agent file that emits it; the thoroughness-flag loops include `fix-bug` |
+
+## Changed by the final review (2026-11-11)
+
+The whole-branch review found places where a lead reading § Builder's calls literally would
+guess. The guide (`guides/ai-workflow.md` § Bug mode) is the current text; it differs from the
+sections above in these points:
+
+- **Diagnosis outcomes are decided by the newest `kind: incident` folder only.** Older `open`,
+  `stopped` or `on-hold` folders are ignored, research runs only when there is none settled and
+  none open, and an owner "stop" ends `BLOCKED`.
+- **A waiver chosen in the decisions step writes `repro: waived` at once,** and stopping there
+  ends `NOT_REPRODUCED`.
+- **Under `--auto` the standby Planner applies spec-review fixes in every entry;** otherwise the
+  lead does. A standby Planner is dispatched in every bug run, `--spec` included.
+- **The state block also carries `spec`, `plan`, `widened` and `red_refix`,** so a resumed run
+  finds its spec and cannot offer a second widening or a second spec re-fix.
+- **With `--spec`, only this run's waiver counts** (`--no-test`); the run document is named
+  from the spec's filename stem.
+- **The gate's hunters do not read decisions.** A "fixed without a repro" finding is withdrawn
+  by Coder's answer citing the waiver decision, as any decision is.
+- **Coder is never resumed while `repro: pending`,** and team-up no longer sets `step: coding`.
 
 ## Left to the builder
 

@@ -1864,6 +1864,44 @@ if [ "$H" = "$ROOT/core" ]; then
   grep -qE '^Status: .*implemented on ' "$ROOT/docs/2026-11-11-fix-bug-design.md" && ok "fix-bug design Status says implemented" || fail "fix-bug design Status not updated"
 fi
 
+# final-review fix pass (2026-11-11): overlapping B1 outcomes, the waiver's state, the --spec
+# entry, counts that survive a resume, and cases that passed on wrong content
+BM=$(sed -n '/^## Bug mode/,/^## Mechanical enforcement/p' "$WF" 2>/dev/null | tr '\n' ' ' | sed 's/  */ /g')
+bm() { printf '%s' "$BM" | grep -qF -- "$1" && ok "## Bug mode: $1" || fail "## Bug mode lacks: $1"; }
+bm 'the newest `kind: incident` folder for the bug ticket'
+bm 'none settled and none open'
+bm 'Older folders that are `open`, `stopped` or `on-hold` are ignored'
+bm 'the run this command just ran'
+bm 'as `kind: incident`'
+bm 'stopped by the owner'
+bm 'Ask the owner: resume it, plan from it as it stands, run a delta, or stop'
+bm 'never resumed while `repro: pending`'
+bm 'A `NOT_REPRODUCED` after the widening'
+bm 'against the investigations'
+bm 'In bug mode the branch gate runs after Red, not at the start'
+bm 'sets no `step: coding`'
+bm "named from the spec's filename stem"
+bm 'Under `--auto` the standby Planner applies them; otherwise the lead does'
+bm 'context is at risk'
+B2T=$(sed -n '/^\*\*B2\. Decisions/,/^\*\*B3\. Planning/p' "$WF" | tr '\n' ' ' | sed 's/  */ /g')
+printf '%s' "$B2T" | grep -qF 'write `repro: waived (D<n>)`' && ok "B2: a waiver answer sets repro: waived" || fail "B2: a waiver answer never sets repro: waived"
+printf '%s' "$B2T" | grep -qF 'final `NOT_REPRODUCED`' && ok "B2: stopping on the repro question has a final status" || fail "B2: stopping on the repro question has no final status"
+NT=$(sed -n '/^\*\*`--no-test`\*\*/,/^\*\*B1\. Diagnosis/p' "$WF" | tr '\n' ' ' | sed 's/  */ /g')
+for tok in 'by: owner' '`--spec` included' 'repro: waived (D<n>)' 'citing'; do
+  printf '%s' "$NT" | grep -qF -- "$tok" && ok "--no-test waiver: $tok" || fail "--no-test waiver lacks: $tok"
+done
+printf '%s' "$NT" | grep -qF 'hunters read that decision' && fail "--no-test waiver: hunters never read decisions (adversarial-review.md)" || ok "--no-test waiver claims no hunter read of decisions"
+SB=$(sed -n '/^state:/,/^```/p' "$WF")
+for tok in '  spec: ' '  plan: ' '  widened: no | yes' '  red_refix: no | yes'; do
+  printf '%s\n' "$SB" | grep -qF -- "$tok" && ok "state block carries '$tok'" || fail "state block lacks '$tok'"
+done
+sed -n '/^### Resume/,/^## Procedure/p' "$WF" | tr '\n' ' ' | sed 's/  */ /g' | grep -qF 'revises the recorded pair' && ok "§ Resume: planning with a recorded spec revises it" || fail "§ Resume: a resumed widening would write a second pair"
+sed -n '/^## Resume/,/^## /p' "$H/commands/feature-flow.md" | tr '\n' ' ' | sed 's/  */ /g' | grep -qF 'The state block'"'"'s `mode` decides the path' && ok "feature-flow § Resume: the state block's mode decides the path" || fail "feature-flow § Resume: mode rule not stated"
+grep -qE 'RED CHECK|SPEC REVIEW' "$H/commands/fix-bug.md" && fail "fix-bug.md carries a brief's text (RED CHECK / SPEC REVIEW belong in the guide)" || ok "fix-bug.md carries no brief text"
+grep -qF 'References list the investigation folders' "$H/agents/planner.md" && ok "planner.md: References list the investigation folders (Reviewer reads them)" || fail "planner.md: Reviewer is never given the diagnosis"
+grep -qF 'read their text in the run document' "$H/agents/planner.md" && ok "planner.md: decision ids are read in the run document" || fail "planner.md: a subagent Planner gets decision ids with no text"
+grep -qF 'no `repro: yes` scenario' "$H/agents/tester.md" && ok "tester.md: a red check with no repro scenario is not REPRODUCED" || fail "tester.md: zero repro scenarios would read as REPRODUCED"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do

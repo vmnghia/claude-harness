@@ -170,6 +170,10 @@ state:
   fix_ticket: FRONT-YYYY
   investigations: [<folder>, …]   # newest first
   repro: pending | REPRODUCED | waived (D<n>)
+  widened: no | yes               # the one delta research run after a failed red check
+  red_refix: no | yes             # the one spec fix after a not_executable repro scenario
+  spec: <path>                    # both modes; written with SPEC_READY, or at creation with --spec
+  plan: <path>
   knobs: {…}   # resolved once per guides/thoroughness.md § Input; never re-resolved
   roster: {lead: main, planner: <agent id or inline>, coder: <id>, tester: <id>, reviewer: <id>}
   decisions:
@@ -342,7 +346,8 @@ position wakes a context.
 the state block's `mode` decides the path (absent means `feature`), whichever command was
 typed. In bug mode, `step: diagnosis` follows § Bug mode B1 (re-scan when the recorded folder
 is settled, else its `AWAITING_HUMAN` rule); `decisions` and `planning` restart from their
-beginning with no team; `spec-review` and `red` restart from B4 with a fresh team; and the
+beginning with no team, and at `planning` with a `spec:` already recorded (a widening was under
+way) Planner revises the recorded pair, never writes a second one; `spec-review` and `red` restart from B4 with a fresh team; and the
 branch gate is re-run only from `coding` on. Every roster id is dead with the old session.
 Re-dispatch Planner (subagent), Coder, Tester and Reviewer fresh, each with the spec, the plan,
 the full `decisions` list and the standby brief; write the new roster; restart the current
@@ -418,40 +423,59 @@ so a run can dispatch up to twice the number typed.
 **`--no-test`** is the owner's waiver of the repro: there is no Tester, so no red and no green
 run. When the run document is created, on every entry (`--spec` included), record a `DECISION`
 `by: owner` ("`--no-test` typed: repro waived") and `repro: waived (D<n>)`, warn once, and say
-so in the recap's first line. Reviewer and the gate's hunters read that decision.
+so in the recap's first line. Reviewer reads that decision in the run document. The gate's
+hunters never read decisions: a "fixed without a repro" finding is withdrawn the usual way, by
+Coder's answer citing `D<n>`, which was recorded before any hunt
+([adversarial-review.md](./adversarial-review.md)).
 
-**B1. Diagnosis.** `step: diagnosis`.
-- **Pick up.** Read the frontmatter of every `.claude/investigations/*/findings.md`. Keep the
-  ones with `ticket:` equal to the bug ticket, `kind: incident` and `status: settled`, following
-  `superseded_by`, newest folder first. Together they are the diagnosis; where two disagree the
-  newest governs. Record them in `investigations:`. A settled run of another kind on the same
-  ticket is not the diagnosis: list it for the owner in B2.
-- **None settled, or `--run-research`:** execute `commands/research.md § New run` for the bug
-  ticket in this session, with the knobs above. Its Framing asks the owner, always, even with
-  `--auto`. When a settled investigation exists, frame a delta run and say so. Write the new
-  folder into `investigations:` as soon as it exists.
-- **An investigation is `status: open`.** Open covers every unfinished run (just framed, paused,
-  mid-critique, ended `PARTIAL`, or live in another session); do not guess which. Ask the owner:
-  resume it, plan from it as it stands, run a delta, or stop. Under `--auto`: final `NEEDS_OWNER`.
+**B1. Diagnosis.** `step: diagnosis`. Read the frontmatter of every
+`.claude/investigations/*/findings.md` and keep the folders with `ticket:` equal to the bug
+ticket and `kind: incident`, following `superseded_by`. The **settled** ones (`status: settled`),
+newest first, are the diagnosis; where two disagree the newest governs. What happens next
+depends on the newest `kind: incident` folder for the bug ticket, and on nothing older: exactly
+one of the cases below applies. Older folders that are `open`, `stopped` or `on-hold` are ignored
+(a run the owner declined at the go gate stays `stopped` for ever). A settled run of another
+kind on the same ticket is not the diagnosis: list it for the owner in B2.
+- **The newest is settled and `--run-research` was not given → pick up.** Record every settled
+  folder in `investigations:` and go to B2.
+- **There is none settled and none open, or `--run-research` was given → run research.** Execute
+  `commands/research.md § New run` for the bug ticket in this session, with the knobs above,
+  framed as `kind: incident`. Its Framing asks the owner, always, even with `--auto`. When a
+  settled investigation exists, frame a delta run and say so. Write the new folder into
+  `investigations:` as soon as it exists. How the run this command just ran ends decides the
+  rest: settled → B2; `PARTIAL` (it stays `open`) → ask the owner whether to plan from it as it
+  stands, run a delta, or stop; `AWAITING_HUMAN` and `STOPPED` → the bullets below.
+- **The newest is `open`** and this command did not just run it. Open covers every unfinished
+  run (just framed, paused, mid-critique, ended `PARTIAL`, or live in another session); do not
+  guess which. Ask the owner: resume it, plan from it as it stands, run a delta, or stop. Under
+  `--auto`: final `NEEDS_OWNER`.
 - **Research returns `AWAITING_HUMAN`:** final `NEEDS_OWNER` with the action. On `--resume` in
   the same session, execute `commands/research.md § Resume` and carry on. From a new session
   that section's step 4 applies unchanged: the lead cannot be resumed and no fresh lead is
   started for an existing run. Offer what it offers (abandon, or a new `-2` run seeded from the
   old one) plus "plan from it as it stands".
-- **`STOPPED`, or `stopped` / `on-hold` on disk:** final `BLOCKED`, quoting `status_reason`.
+- **The newest is `stopped` or `on-hold`, or the run just returned `STOPPED`:** final `BLOCKED`,
+  quoting `status_reason`.
 - **Next says "No build needed":** final `NO_BUILD_NEEDED`, quoting the Answer.
+- **The owner answers "stop" or "abandon"** to any question above: final `BLOCKED`, summary
+  "stopped by the owner".
 
 **B2. Decisions.** `step: decisions`. Read the investigations' `## Open`, `## Options`,
 `## Decisions` and `## Repro`. List what only the owner can settle and has not: Open rows whose
 resolver is the owner, an Options table with no Decisions row choosing, and a Repro that is not
 `REPRODUCED` (the choices: waive the repro and proceed on the evidence, try Red anyway with the
-steps the investigation attempted, or stop). Ask once, with `AskUserQuestion`, the research's
+steps the investigation attempted, or stop). On "waive", write `repro: waived (D<n>)` with the
+decision; on "stop", final `NOT_REPRODUCED`. Ask once, with `AskUserQuestion`, the research's
 recommendation first in each. Each answer is a `DECISION` block `by: owner` in the state block;
 `findings.md` is not touched. Nothing to decide: no pause. Under `--auto` with something to
 decide: final `NEEDS_OWNER` listing the questions; a council never assumes an owner's decision
-about a bug fix.
+about a bug fix. § Procedure's first paragraph holds from B1 on: B2 is a step boundary after
+what may have been a long research run in this session, so when the lead's context is at risk,
+write the state block and stop with the resume command.
 
-**B3. Planning.** `step: planning`. As § Procedure step 1, with one more capsule item:
+**B3. Planning.** `step: planning`. As § Procedure step 1, except that the run document already
+exists (never create a second one) and `SPEC_READY` also writes `spec:` and `plan:` into the
+state block. One more capsule item:
 
 ```yaml
 diagnosis:
@@ -466,37 +490,49 @@ Planner writes a bug spec from it (`agents/planner.md`): the root cause in the i
 words, Repro Steps from its `## Repro`, and at least one Test Scenario marked `repro: yes` with
 `expected (unfixed)` and `expected (fixed)`, unless the repro was waived.
 
-**B4. Team up.** As § Procedure step 2, except that **Coder also gets the standby brief** and
-starts nothing. With `--spec`, check first that the sibling plan exists and that the spec has a
-`repro: yes` scenario (or the repro is waived); otherwise final `NEEDS_CLARIFICATION` naming
+**B4. Team up.** As § Procedure step 2, with three differences. **Coder also gets the standby
+brief** and starts nothing. A standby Planner is dispatched in every bug run, `--spec` included,
+so the spec's intent has a voice and a spec fix has an author. And B4 sets no `step: coding`:
+the step becomes `spec-review` when B5 and B6 go out, `red` when only Red is still open, and
+`coding` only at B7. In bug mode Coder is never resumed while `repro: pending`.
+
+With `--spec` the run starts here: the run document is created with `step: spec-review`, `spec:`
+and `plan:` as given, and is named from the spec's filename stem when no ticket was typed.
+Check first that the sibling plan exists and that the spec has a `repro: yes` scenario, unless
+this run's state block already says `repro: waived` (`--no-test`); a `waived (D<n>)` written
+into the spec by an earlier run does not count. Otherwise final `NEEDS_CLARIFICATION` naming
 what is missing.
 
 **B5. Spec review** and **B6. Red** go out in one message.
 
 **B5. Spec review.** `step: spec-review`. Resume Reviewer: "SPEC REVIEW: read the spec and the
-plan against the code as it stands". `SPEC_APPROVED` → nothing to do.
+plan against the code as it stands and against the investigations: <folders>" (none with
+`--spec` and no ticket). `SPEC_APPROVED` → nothing to do.
 `SPEC_CHANGES_REQUESTED` → every `blocker` and `major` is fixed in the spec and plan before
-coding. Under `--auto` resume the standby Planner with "FIX FROM SPEC REVIEW" and the
-`findings[]`; in every other case (inline planning, `--spec`, a resumed run) the lead applies
-them. A finding whose fix changes an owner decision goes to the owner, not to a council.
-One pass: no re-review, no counter. Reviewer keeps what it read for step 5.
+coding. Under `--auto` the standby Planner applies them; otherwise the lead does. The Planner
+is resumed with "FIX FROM SPEC REVIEW" and the `findings[]`. A finding whose fix changes an owner decision goes to the owner, not to a council.
+One pass: no re-review of the fixes, no counter (after a widening the changed parts get their
+own single pass). Reviewer keeps what it read for step 5.
 
 **B6. Red.** `step: red`. Skipped when `repro: waived`. Resume Tester: "RED CHECK: drive only
 the `repro: yes` scenarios on the tree as it is, against `expected (unfixed)`; run slug
 <slug>". Its block lists a result per scenario (`reproduced`, `not_reproduced`,
 `not_executable`) and evidence under `.claude/runs/<run-slug>-evidence/`.
 - `REPRODUCED` → `repro: REPRODUCED` and the evidence paths into the state block.
-- A `not_executable` scenario is a spec defect: add it to B5's findings, fix the spec, and run
-  Red once more. A second `not_executable` is `NOT_REPRODUCED`. A spec fix from B5 that changes
-  a `repro: yes` scenario's steps also makes Red run again.
+- Read `repro_results[]` before the status. A `not_executable` scenario is a spec defect, not
+  a red result: add it to B5's findings, fix the spec, set `red_refix: yes` and run Red again.
+  That happens once per run: with `red_refix: yes` already set, a `not_executable` counts as
+  `not_reproduced`. A spec fix from B5 that changes a `repro: yes` scenario's steps also makes
+  Red run again.
 - `NOT_REPRODUCED` → the owner chooses: widen the net, proceed on the evidence, or stop.
   Proceeding is a `DECISION` `by: owner` and `repro: waived (D<n>)`. Stopping is final
   `NOT_REPRODUCED`. Under `--auto`: final `NOT_REPRODUCED`. Never proceed silently.
 - **Widening the net** is a delta research run whose question is the repro (B1's second
   bullet). When it settles, go back to B2 for what is new, then B3 with Planner revising the
   existing pair (the lead does it: widening never happens under `--auto`), then B5 on the
-  changed parts and B6 again, with the same team. One widening per run: after a second
-  `NOT_REPRODUCED` the owner's choices are proceed or stop.
+  changed parts and B6 again, with the same team. One widening per run: set `widened: yes`
+  when it starts. A `NOT_REPRODUCED` after the widening leaves the owner two choices, proceed or
+  stop.
 
 **Branch gate.** As § Branch policy, always. In bug mode the branch gate runs after Red, not at
 the start: [bug-fixes.md](../rules/bug-fixes.md) says not to prepare a branch before the repro

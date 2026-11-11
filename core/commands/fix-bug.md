@@ -52,7 +52,7 @@ Missing bug ticket without `--spec` or `--resume` → stop with the final block,
 ## Where each phase runs
 
 - **Run document:** created and written by you, first, with `mode: bug` and `step: diagnosis`
-  (`step: spec-review` with `--spec`); before creating it, `git check-ignore -q .claude/runs/`
+  (with `--spec`, as the guide's § Bug mode B4 says); before creating it, `git check-ignore -q .claude/runs/`
   (trailing slash) and warn once when it fails.
 - **Diagnosis:** the pick-up scan (`kind: incident`, settled, for the bug ticket) in this
   session. A research run: execute `commands/research.md` § New run **inline in this session**

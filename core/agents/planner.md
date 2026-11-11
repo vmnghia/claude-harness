@@ -51,7 +51,11 @@ requirement. If empty, emit `NEEDS_CLARIFICATION` with
        Tester drives these before the fix and again after it. With a waived repro no scenario
        carries `repro: yes`.
      - The owner's `decisions` become dated rows in the spec, and you do not re-ask what the
-       diagnosis or a decision settles.
+       diagnosis or a decision settles. The capsule gives decision ids:
+       read their text in the run document's state block (`decisions:`); its path is in the
+       capsule.
+     - References list the investigation folders, so Reviewer's spec review can hold the spec
+       against the diagnosis.
      - Constraints still state that the flow follows [`bug-fixes.md`](../rules/bug-fixes.md).
    - Jira key → fetch via `mcp__plugin_atlassian_atlassian__getJiraIssue`
      (description + comments). Follow linked Confluence pages via
