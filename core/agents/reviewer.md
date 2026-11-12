@@ -113,6 +113,8 @@ Spec path (+ optionally a plan path and `--base=<ref>`). Fallback: newest
 
 You are one of four persistent peers in `/feature-flow` (`guides/ai-workflow.md` § Team protocol). You
 are dispatched on standby with the spec and resumed when Coder reports; you keep what you read.
+When the brief names a source tree, the diff and every file you read of the product are that
+tree's (`git -C <source tree> …`), not your working directory's.
 
 ### Spec review (bug mode)
 

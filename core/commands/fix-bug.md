@@ -1,6 +1,6 @@
 ---
 description: Bug-fix flow as a team — diagnosis (a settled /research investigation, picked up or run), the owner's decisions, a bug spec, a spec review and a red run on the unfixed tree, then the /feature-flow team fixes it and proves it green on the same steps; ends ready for human apply
-argument-hint: <FRONT-XXXX> [--run-research] [--fix-ticket=FRONT-YYYY] [--spec=<spec path>] [--auto] [--no-test] [--max-iter=N] [--max-gate-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] [--resume [<run-document>]]
+argument-hint: <FRONT-XXXX> [--run-research] [--fix-ticket=FRONT-YYYY] [--spec=<spec path>] [--tree=<path>] [--auto] [--no-test] [--max-iter=N] [--max-gate-iter=N] [--effort=quick|standard|thorough|exhaustive] [--width=<agent>:<n>,…] [--dry=K] [--max-agents=N] [--resume [<run-document>]]
 ---
 
 Contract: Read [`.claude/guides/ai-workflow.md`](../guides/ai-workflow.md) first and execute its
@@ -29,6 +29,10 @@ Raw arguments: `$ARGUMENTS`. Parse out:
 - `--fix-ticket=FRONT-YYYY` → the ticket the spec is written for. Default: the bug ticket.
 - `--spec=<spec path>` → the spec and its sibling `-plan.md` already exist; enter at Team up
   (guide § Bug mode B4, which checks the pair and its repro scenario).
+- `--tree=<path>` → the source tree, when the fix is made somewhere other than this session's
+  working directory (a git worktree). Record it as `source_tree` and name it in every brief
+  (guide § Branch policy, Source tree). Without it the owner can still name one at the branch
+  gate.
 - `--auto` → as in `/feature-flow` for planning and councils. It never assumes the owner's
   decisions about a bug: the guide ends `NEEDS_OWNER` or `NOT_REPRODUCED` where the owner would
   have been asked. Research's Framing still asks.
@@ -64,7 +68,7 @@ Missing bug ticket without `--spec` or `--resume` → stop with the final block,
   `SendMessage` once with ToolSearch `select:SendMessage`.
 - **Spec review and red:** two `SendMessage` resumes in one message, Reviewer and Tester, with
   the briefs the guide names. Do not resume Coder until both are back and the spec is final.
-- **Branch gate:** `git rev-parse --abbrev-ref HEAD` in this session, after the red run and
+- **Branch gate:** `git rev-parse --abbrev-ref HEAD` in the source tree, after the red run and
   before Coder's first resume; on a shared branch ask the owner to branch or proceed. Never
   create the branch yourself. Always, even with `--auto`.
 - **Every later step** (coding, testing, reviewing, the switchboard, decisions with a
@@ -105,6 +109,7 @@ summary: <one line>
 - Everything [`feature-flow.md`](./feature-flow.md) § What you do NOT do lists: no commits,
   pushes or branch creation, no source edits by you, no judging of what you forward, never one
   collapsed dispatch for the team-up, never a re-dispatch of a live peer.
+- Never condense what goes into the run document: each peer reply is appended whole.
 - Never write `findings.md` after research's Framing has created it: the owner's decisions go
   into the run document and the spec.
 - Never start a fresh research lead for an existing run.

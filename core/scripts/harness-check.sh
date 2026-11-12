@@ -1902,6 +1902,23 @@ grep -qF 'References list the investigation folders' "$H/agents/planner.md" && o
 grep -qF 'read their text in the run document' "$H/agents/planner.md" && ok "planner.md: decision ids are read in the run document" || fail "planner.md: a subagent Planner gets decision ids with no text"
 grep -qF 'no `repro: yes` scenario' "$H/agents/tester.md" && ok "tester.md: a red check with no repro scenario is not REPRODUCED" || fail "tester.md: zero repro scenarios would read as REPRODUCED"
 
+# smoke findings (2026-11-12, first real /fix-bug run): the source tree is named, a scenario
+# that was not driven is never `pass`, and the run document is never condensed
+WFF=$(tr '\n' ' ' < "$WF" | sed 's/  */ /g')
+sed -n '/^state:/,/^```/p' "$WF" | grep -qF '  source_tree: ' && ok "state block carries source_tree" || fail "state block lacks source_tree"
+for tok in 'Every brief names the source tree' 'git -C <source_tree>' 'never condensed' 'not verified'; do
+  printf '%s' "$WFF" | grep -qF -- "$tok" && ok "ai-workflow.md: $tok" || fail "ai-workflow.md lacks: $tok"
+done
+sed -n '/^### Resume/,/^## Procedure/p' "$WF" | grep -qF 'source_tree' && ok "§ Resume keeps source_tree" || fail "§ Resume drops source_tree"
+grep -m1 '^argument-hint:' "$H/commands/fix-bug.md" | grep -qF -- '--tree=' && ok "fix-bug argument-hint carries --tree=" || fail "fix-bug argument-hint lacks --tree="
+grep -qF -- '`--tree=<path>`' "$H/commands/fix-bug.md" && ok "fix-bug § Input explains --tree" || fail "fix-bug § Input lacks --tree"
+grep -qiF 'condense' "$H/commands/fix-bug.md" && ok "fix-bug: the lead never condenses a block" || fail "fix-bug: nothing forbids condensing the run document"
+for a in coder tester reviewer; do
+  grep -qF 'source tree' "$H/agents/$a.md" && ok "$a.md knows the source tree" || fail "$a.md never mentions the source tree"
+done
+btok 'not_run' tester.md
+grep -qF 'never `pass`' "$H/agents/tester.md" && ok "tester.md: a scenario that was not driven is never pass" || fail "tester.md: an undriven scenario can be reported as pass"
+
 echo "== 6. Spec/plan pair naming =="
 PAIR_OK=true
 for plan in "$H"/specs/*-plan.md; do

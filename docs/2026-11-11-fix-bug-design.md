@@ -416,7 +416,9 @@ What it showed, against § Acceptance row 2 and the steps it reached:
 | B7 testing | green on the same steps, red and green side by side | `PASS`, 17 scenarios; `repro_results` lists each repro scenario's red and green folders (red 5617 and 5100 against green 5612 on both) |
 | Pause | a resumable state | `step: reviewing`, the resume command and the saved patch are in the run document |
 
-What the run showed that the design did not foresee (none fixed yet):
+What the run showed that the design did not foresee. Items 1 to 3 were fixed on 2026-11-12
+(`source_tree` and `--tree=<path>`; a `not_run` scenario result that is never `pass` and is
+reported as not verified; "never condensed" for the run document). Items 4 and 5 are open:
 
 1. **The source tree was not the session's working directory.** The owner cut a git worktree
    for the fix; the lead's own directory was another ticket's branch. The lead ran the branch

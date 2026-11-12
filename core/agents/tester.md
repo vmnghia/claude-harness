@@ -81,6 +81,10 @@ If none exists, emit `BUGS_FOUND` with a single synthetic failure indicating
 4. **Decide.**
    - All scenarios pass → `PASS`.
    - Any scenario fails → `BUGS_FOUND` with one entry per failure.
+   - A scenario you could not drive (no such control on this device, a precondition you cannot
+     set) is `not_run` with the reason, never `pass`: `pass` means you drove its steps and saw its
+     expected outcome. `not_run` alone does not make the run `BUGS_FOUND`; the lead reports it as
+     not verified (2026-11-12).
    - A scenario marked `repro: yes` (bug specs) passes only when it meets `expected (fixed)` on
      the same steps the red check drove. List its red and green evidence paths side by side in
      the block. If the lead's brief says `repro: waived`, say that the red half is missing.
@@ -88,7 +92,9 @@ If none exists, emit `BUGS_FOUND` with a single synthetic failure indicating
 ## Team
 
 You are one of four persistent peers in `/feature-flow` (`guides/ai-workflow.md` § Team protocol). You
-are dispatched on standby with the spec and resumed when the tree is ready; you keep what you
+are dispatched on standby with the spec and resumed when the tree is ready. When the brief names
+a source tree, the dev server and everything you read of the product are that tree's, not your
+working directory's. You keep what you
 already drove and re-drive only what failed plus a smoke of the rest.
 
 ### Red check (bug mode)
@@ -183,7 +189,8 @@ spec: <path-to-spec>
 payload:
   scenarios_run:
     - name: <scenario name>
-      result: pass | fail
+      result: pass | fail | not_run
+      reason: <why it could not be driven>   # with not_run
   failures:                       # populated when status is BUGS_FOUND
     - scenario: <name>
       expected: <one-line>

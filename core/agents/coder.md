@@ -107,7 +107,9 @@ owner decides.
 
 You are one of four persistent peers in `/feature-flow` (`guides/ai-workflow.md` § Team protocol). The
 lead reaches you by message; you keep your context for the whole run and are resumed, not
-re-dispatched, for every fix.
+re-dispatched, for every fix. When the brief names a source tree, every read, edit and command
+on product source happens there, not in your working directory; the spec, the plan and the run
+document stay where the brief's absolute paths say.
 
 **Standby in bug mode.** In a `/fix-bug` run (`guides/ai-workflow.md` § Bug mode B4) you are
 dispatched on standby like the others and start nothing: the spec may still change in the spec

@@ -81,7 +81,7 @@ payload:
 | -------- | ------------------------------------ | --------------------- |
 | Planner  | `SPEC_READY` / `NEEDS_CLARIFICATION` | `spec_path`, `plan_path`, `summary`, `is_bug_spec`, `open_questions[]` |
 | Coder    | `IMPLEMENTED` / `BLOCKED`            | `changed_files[]` (each: `path`, `note`), `notes`, `build_result`, `test_result: pass\|fail\|n/a`, `blockers[]` |
-| Tester   | `PASS` / `BUGS_FOUND`; `REPRODUCED` / `NOT_REPRODUCED` (bug mode's red check) | `scenarios_run[]`, `failures[]` (each: scenario, expected, actual, evidence path, console); red check: `repro_results[]` (each: scenario, `reproduced \| not_reproduced \| not_executable`, evidence path), `positive_control` |
+| Tester   | `PASS` / `BUGS_FOUND`; `REPRODUCED` / `NOT_REPRODUCED` (bug mode's red check) | `scenarios_run[]` (each: name, `pass \| fail \| not_run`, a reason with `not_run`), `failures[]` (each: scenario, expected, actual, evidence path, console); red check: `repro_results[]` (each: scenario, `reproduced \| not_reproduced \| not_executable`, evidence path), `positive_control` |
 | Reviewer | `APPROVED` / `CHANGES_REQUESTED`; `SPEC_APPROVED` / `SPEC_CHANGES_REQUESTED` (bug mode's spec review) | `findings[]` (each: severity, file, line, issue, suggestion), `summary` |
 
 Every peer block may also carry `decisions_applied: [D…]` and `questions_asked: [Q…]`
@@ -137,6 +137,15 @@ Orchestrator branch gate: if the current branch matches `master`, `main`,
 feature branch (named per [git.md](../rules/git.md)) or proceed. Shown even with
 `--auto`.
 
+**Source tree.** Product source is read, edited, built and served in one place, the run's
+source tree. It is the session's working directory unless the owner names another: a git
+worktree cut for the fix, given by `--tree=<path>` or as the owner's answer at the branch gate.
+The lead records it as `source_tree` and runs the branch gate there
+(`git -C <source_tree> rev-parse --abbrev-ref HEAD`). The spec, the plan, the run document, the
+evidence folder and the investigations stay under the session's own `.claude/`, and briefs give
+those as absolute paths (2026-11-12: a first `/fix-bug` run worked in a worktree on the lead's
+judgment alone).
+
 ## Team protocol
 
 `/feature-flow` is a **lead and a team of persistent peers**, not a pipeline (design:
@@ -174,6 +183,7 @@ state:
   red_refix: no | yes             # the one spec fix after a not_executable repro scenario
   spec: <path>                    # both modes; written with SPEC_READY, or at creation with --spec
   plan: <path>
+  source_tree: <absolute path>    # both modes; absent means the session's working directory (§ Branch policy)
   knobs: {…}   # resolved once per guides/thoroughness.md § Input; never re-resolved
   roster: {lead: main, planner: <agent id or inline>, coder: <id>, tester: <id>, reviewer: <id>}
   decisions:
@@ -182,11 +192,15 @@ state:
   assumptions: [D3]      # decisions with by: assumed, listed in the recap
 ```
 
-Then, appended verbatim as they happen: every status block, every `QUESTION`, `ANSWER`,
+Then, appended verbatim as they happen, never condensed (a peer's reply goes in whole, its prose
+and its block: a lead resumed in a new session has this file and no transcript, 2026-11-12): every status block, every `QUESTION`, `ANSWER`,
 `OBJECTION`, `POSITION` and `DECISION`, under `## <step>` headings. A peer that is resumed or
 re-dispatched reads the decisions first. The roster lives in the state block only: peers address
 `main` and name roles in `to:`, so no peer ever needs an id and the lead sends no roster message
 (every unneeded message to a standby peer is a wake). The standby brief names the roles on the team.
+
+Every brief names the source tree when `source_tree` is set, at dispatch and on every resume
+that asks for work in it.
 
 **Standby brief** (Tester, Reviewer and the standby Planner at dispatch): the spec path, the
 plan path, the run-document path, the roles on the team, and: "read the run document's decisions
@@ -353,7 +367,7 @@ Re-dispatch Planner (subagent), Coder, Tester and Reviewer fresh, each with the 
 the full `decisions` list and the standby brief; write the new roster; restart the current
 `step` from its beginning (a half-done coding step runs again on the tree as it is, with Coder
 told what the previous Coder reported). `test_iter`, `review_iter` and `gate_iter` are kept.
-`knobs` is kept, never re-resolved; the gate's case file copies it. A `QUESTION` or `OBJECTION` that was open is re-raised by the
+`knobs` and `source_tree` are kept, never re-resolved; the gate's case file copies it. A `QUESTION` or `OBJECTION` that was open is re-raised by the
 re-dispatched peer if it still applies. The gate resumes per [adversarial-review.md](./adversarial-review.md) § Resume.
 
 ## Procedure
@@ -375,7 +389,8 @@ rather than discovering it mid-gate.
    its `to:` by id; its `ANSWER` → back to the asker. `IMPLEMENTED` → `step: testing`. `BLOCKED`
    → final `BLOCKED`.
 4. **Testing.** Resume Tester: "the tree is ready; decisions so far: D…". Forward its questions
-   to Coder and the answers back. `PASS` → `step: reviewing`. `BUGS_FOUND` → resume Coder with
+   to Coder and the answers back. `PASS` → `step: reviewing`; any scenario it reports `not_run` is not verified, and goes into
+   the recap under that name with Tester's reason. `BUGS_FOUND` → resume Coder with
    `failures[]` ("FIX FROM TESTER"), `test_iter++`, then resume Tester (it re-drives what failed
    plus a smoke of the rest). At the cap → `BUG_LIMIT_REACHED`. `--no-test` skips this step and
    Tester's council voice, with a warning.
@@ -401,7 +416,8 @@ rather than discovering it mid-gate.
    gate's breaker → `STALLED`.
 7. **Finish.** `step: done`. Recap: spec and plan paths, run-document and case-file paths,
    `changed_files[]`, the three counters, every decision with `by:` and who it applied to, the
-   assumptions, remaining minors and nits, and the owner's next step (commit). Then the final
+   assumptions, the scenarios Tester could not run (not verified, each with its reason), remaining
+   minors and nits, and the owner's next step (commit). Then the final
    block.
 
 ## Bug mode
