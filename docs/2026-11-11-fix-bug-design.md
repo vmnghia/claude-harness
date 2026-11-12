@@ -1,7 +1,8 @@
 # `/fix-bug`: the team flow for a bug, from diagnosis to a fix proven against its repro
 
-Status: approved by the owner 2026-11-11 (builder check done); implemented on `feat/fix-bug`
-2026-11-11. Acceptance rows 2 to 5 are open: the smokes have not been run.
+Status: approved by the owner 2026-11-11 (builder check done); implemented on `feat/fix-bug` and
+merged 2026-11-11 (`d0246f0`). Acceptance row 2 is verified by a real run (§ Verified); rows 3
+to 5 are open.
 
 Read first: [2026-10-22-team-flow-design.md](./2026-10-22-team-flow-design.md) (the lead, the
 persistent peers, the run document), [2026-10-14-research-workflow-design.md](./2026-10-14-research-workflow-design.md)
@@ -393,3 +394,45 @@ sections above in these points:
 4. **Full run** from a ticket with no investigation, at `--effort=quick`, on the next suitable
    bug. Until then this row stays open, and the Status line says so.
 5. A `/feature-flow` run document from before this change resumes unchanged.
+
+## Verified
+
+**2026-11-11 to 2026-11-12, the reference project, harness `d0246f0`.** The owner ran
+`/fix-bug FRONT-AAAA --fix-ticket=FRONT-BBBB --spec=<the reference fix ticket's spec>` in the
+session that had done the research and written the spec. The run document is
+`.claude/runs/2026-11-11-front-bbbb.md` there. It was paused by the owner at `step: reviewing`
+(the team had not decided whether to ship the fix), so the code review and the gate did not run.
+
+What it showed, against § Acceptance row 2 and the steps it reached:
+
+| Step | Expected | Seen |
+|---|---|---|
+| B4 team up | four peers on standby, Coder included | four dispatches in one message, all standby; state block has `mode: bug`, both tickets, both investigations, `spec`, `plan`, `widened: no`, `red_refix: no` |
+| B5 + B6 | one message | the `SPEC REVIEW` and `RED CHECK` resumes were sent together |
+| B6 red | `REPRODUCED` with evidence under `.claude/runs/…-evidence/`, before any source change | `REPRODUCED` on both `repro: yes` scenarios, with a positive control and evidence folders `S2-red/`, `S14-red/`; the fix worktree was clean |
+| B5 spec review | findings before coding; an owner-decision finding goes to the owner | `SPEC_CHANGES_REQUESTED`: 3 major, 6 minor, 1 nit. One major became owner decision D1 by `AskUserQuestion`; the lead applied the rest in one pass. The repro scenarios' steps did not change, so Red stood |
+| Branch gate | after Red | recorded after the spec-review resolution, before Coder's first resume |
+| B7 coding | Coder resumed with "the spec is final; repro: …; decisions so far: D…" | sent as written; `IMPLEMENTED`, `decisions_applied: [D1]` |
+| B7 testing | green on the same steps, red and green side by side | `PASS`, 17 scenarios; `repro_results` lists each repro scenario's red and green folders (red 5617 and 5100 against green 5612 on both) |
+| Pause | a resumable state | `step: reviewing`, the resume command and the saved patch are in the run document |
+
+What the run showed that the design did not foresee (none fixed yet):
+
+1. **The source tree was not the session's working directory.** The owner cut a git worktree
+   for the fix; the lead's own directory was another ticket's branch. The lead ran the branch
+   gate in the worktree and wrote the tree's path into "Lead notes" and every brief. Nothing in
+   the guide names a source tree, so this worked on the lead's judgment.
+2. **Tester reported a scenario it could not drive as `pass`** ("not exercisable on desktop: no
+   wallet button renders"). `not_executable` exists only for the red check; the green run has
+   no way to say "not run".
+3. **The run document was condensed.** The guide says blocks are appended verbatim; the lead
+   wrote one line per Reviewer finding and "full prose in the lead's transcript". A resumed
+   lead in a new session has no transcript.
+4. **A scenario passed on its second run** after the first hit a gap the spec accepts. The lead
+   carried it forward as an open owner question; the block says `pass`.
+5. **Coder made one edit with a shell heredoc,** outside its Bash whitelist, and said so.
+
+Not exercised by this run: the pick-up entry without `--spec` (row 3; the state block did carry
+both investigations), a run from a ticket with no investigation (row 4), `--resume`, `--auto`,
+`--no-test`, a failed red check, and a `/feature-flow` run document from before this change
+(row 5).
